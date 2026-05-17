@@ -281,12 +281,56 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+/* ===== FILTERS ===== */
+let allActiveDocs = [];
+let currentFilter = 'tutte';
+
+const emptyMessages = {
+  tutte:  { icon: '⚔️', text: 'Nessuna quest attiva.<br>Premi + per aggiungerne una.' },
+  oggi:   { icon: '🎉', text: 'Nessuna task in scadenza oggi!<br>Goditela!' },
+  domani: { icon: '🎉', text: 'Nessuna task in scadenza domani!' }
+};
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth()    === b.getMonth()    &&
+         a.getDate()     === b.getDate();
+}
+
+function getFilteredDocs() {
+  if (currentFilter === 'tutte') return allActiveDocs;
+  const today    = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  return allActiveDocs.filter(doc => {
+    const d = doc.data().scadenza.toDate();
+    return currentFilter === 'oggi' ? isSameDay(d, today) : isSameDay(d, tomorrow);
+  });
+}
+
+function applyFilter() {
+  renderTasks(getFilteredDocs());
+}
+
+document.querySelectorAll('.filter-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    currentFilter = chip.dataset.filter;
+    applyFilter();
+  });
+});
+
 function renderTasks(docs) {
-  const list  = document.getElementById('task-list');
-  const empty = document.getElementById('empty-state');
-  list.innerHTML = '';
+  const list      = document.getElementById('task-list');
+  const empty     = document.getElementById('empty-state');
+  const emptyIcon = document.getElementById('empty-icon');
+  const emptyMsg  = document.getElementById('empty-msg');
+  list.innerHTML  = '';
 
   if (docs.length === 0) {
+    const m = emptyMessages[currentFilter];
+    emptyIcon.textContent = m.icon;
+    emptyMsg.innerHTML    = m.text;
     empty.classList.remove('hidden');
     return;
   }
@@ -332,7 +376,16 @@ db.collection('tasks')
   .where('stato', '==', 'attiva')
   .orderBy('scadenza', 'asc')
   .onSnapshot(snapshot => {
-    renderTasks(snapshot.docs);
+    allActiveDocs = snapshot.docs;
+    applyFilter();
   }, err => {
     console.error('Firestore listener error:', err);
   });
+
+/* ===== SERVICE WORKER ===== */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/todo-gamification/sw.js')
+      .catch(err => console.warn('SW non registrato (funziona solo su HTTPS o localhost):', err));
+  });
+}

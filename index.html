@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Todo Gamification</title>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="QuestList">
+  <meta name="theme-color" content="#7c3aed">
+  <title>QuestList</title>
+  <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -32,10 +38,15 @@
 
     <!-- HOME -->
     <section id="section-home" class="section active">
+      <div class="filter-bar">
+        <button class="filter-chip active" data-filter="tutte">Tutte</button>
+        <button class="filter-chip" data-filter="oggi">Oggi</button>
+        <button class="filter-chip" data-filter="domani">Domani</button>
+      </div>
       <div id="task-list" class="task-list"></div>
       <div id="empty-state" class="empty-state hidden">
-        <div class="empty-icon">⚔️</div>
-        <p>Nessuna quest attiva.<br>Premi + per aggiungerne una.</p>
+        <div id="empty-icon" class="empty-icon">⚔️</div>
+        <p id="empty-msg">Nessuna quest attiva.<br>Premi + per aggiungerne una.</p>
       </div>
     </section>
 
