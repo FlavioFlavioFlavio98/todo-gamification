@@ -75,7 +75,7 @@ async function runFirebaseTest() {
 btnTest.addEventListener('click', runFirebaseTest);
 
 /* ===== INIT ===== */
-setCoinDisplay(0);
+// coin display is set by the Firestore settings listener below
 
 /* ===== FORM STATE ===== */
 let calYear, calMonth, calSelected = null;
@@ -281,9 +281,33 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-/* ===== FILTERS ===== */
-let allActiveDocs = [];
+/* ===== COIN BALANCE ===== */
+let coinBalance = 0;
+
+db.collection('settings').doc('user').onSnapshot(snap => {
+  if (snap.exists) {
+    coinBalance = snap.data().coins ?? 0;
+  } else {
+    coinBalance = 0;
+    db.collection('settings').doc('user').set({ coins: 0 });
+  }
+  setCoinDisplay(coinBalance);
+});
+
+async function updateCoins(delta) {
+  coinBalance += delta;
+  setCoinDisplay(coinBalance);
+  try {
+    await db.collection('settings').doc('user').set({ coins: coinBalance }, { merge: true });
+  } catch (e) {
+    console.error('updateCoins error:', e);
+  }
+}
+
+/* ===== FILTERS & SMART SORT ===== */
+let allTaskDocs   = [];
 let currentFilter = 'tutte';
+let pendingComplete = null;
 
 const emptyMessages = {
   tutte:  { icon: '⚔️', text: 'Nessuna quest attiva.<br>Premi + per aggiungerne una.' },
@@ -297,14 +321,42 @@ function isSameDay(a, b) {
          a.getDate()     === b.getDate();
 }
 
-function getFilteredDocs() {
-  if (currentFilter === 'tutte') return allActiveDocs;
+function smartSort(docs) {
   const today    = new Date(); today.setHours(0,0,0,0);
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  return allActiveDocs.filter(doc => {
-    const d = doc.data().scadenza.toDate();
-    return currentFilter === 'oggi' ? isSameDay(d, today) : isSameDay(d, tomorrow);
+  const dayAfter = new Date(tomorrow); dayAfter.setDate(tomorrow.getDate() + 1);
+
+  const active = docs.filter(d => d.data().stato === 'attiva');
+  const failed = docs.filter(d => d.data().stato === 'fallita');
+
+  const gr1 = active.filter(d => isSameDay(d.data().scadenza.toDate(), today));
+  const gr2 = active.filter(d => isSameDay(d.data().scadenza.toDate(), tomorrow));
+  const gr3 = active.filter(d => {
+    const s = d.data().scadenza.toDate(); s.setHours(0,0,0,0);
+    return s >= dayAfter;
   });
+
+  gr1.sort((a,b) => b.data().reward - a.data().reward);
+  gr2.sort((a,b) => b.data().reward - a.data().reward);
+  gr3.sort((a,b) => a.data().scadenza.toDate() - b.data().scadenza.toDate());
+  failed.sort((a,b) => b.data().scadenza.toDate() - a.data().scadenza.toDate());
+
+  return [...gr1, ...gr2, ...gr3, ...failed];
+}
+
+function getFilteredDocs() {
+  const skipId = pendingComplete?.docId;
+  const docs   = skipId ? allTaskDocs.filter(d => d.id !== skipId) : allTaskDocs;
+
+  if (currentFilter === 'tutte') return smartSort(docs);
+
+  const today    = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const ref = currentFilter === 'oggi' ? today : tomorrow;
+
+  return docs
+    .filter(d => d.data().stato === 'attiva' && isSameDay(d.data().scadenza.toDate(), ref))
+    .sort((a,b) => b.data().reward - a.data().reward);
 }
 
 function applyFilter() {
@@ -337,50 +389,296 @@ function renderTasks(docs) {
   empty.classList.add('hidden');
 
   docs.forEach(doc => {
-    const t    = doc.data();
-    const card = document.createElement('div');
-    card.className = 'task-card';
-    card.innerHTML = `
+    const t      = doc.data();
+    const failed = t.stato === 'fallita';
+    const card   = document.createElement('div');
+    card.className  = 'task-card' + (failed ? ' task-card-failed' : '');
+    card.dataset.id = doc.id;
+    card.innerHTML  = `
       <div class="task-card-top">
         <span class="task-name">${escapeHtml(t.nome)}</span>
         <span class="priority-dot priority-${t.priorita}"></span>
       </div>
       ${t.descrizione ? `<p class="task-desc">${escapeHtml(t.descrizione)}</p>` : ''}
       <div class="task-card-bottom">
-        <span class="task-date">📅 ${formatDateIT(t.scadenza)}</span>
+        <span class="task-date">${failed ? '⚠️' : '📅'} ${formatDateIT(t.scadenza)}</span>
         <div class="task-pills">
-          <span class="pill pill-green">💰 +${t.reward}</span>
+          ${!failed ? `<span class="pill pill-green">💰 +${t.reward}</span>` : ''}
           <span class="pill pill-red">💀 -${t.penalita}</span>
         </div>
-        <button class="btn-complete" data-id="${doc.id}" title="Completa task">✓</button>
+        <button class="btn-complete${failed ? ' btn-complete-late' : ''}" data-id="${doc.id}">✓</button>
       </div>
     `;
     list.appendChild(card);
   });
 
   list.querySelectorAll('.btn-complete').forEach(btn => {
-    btn.addEventListener('click', () => completeTask(btn.dataset.id));
+    btn.addEventListener('click', () => {
+      const doc = allTaskDocs.find(d => d.id === btn.dataset.id);
+      if (doc) completeTask(btn.dataset.id, doc.data(), btn);
+    });
   });
 }
 
-async function completeTask(id) {
+/* ===== COIN ANIMATION ===== */
+function showCoinAnimation(reward, anchorEl) {
+  const anim = document.createElement('div');
+  anim.className   = 'coin-float';
+  anim.textContent = `+${reward} 💰`;
+  const rect = anchorEl.getBoundingClientRect();
+  anim.style.left  = (rect.left + rect.width / 2) + 'px';
+  anim.style.top   = rect.top + 'px';
+  document.body.appendChild(anim);
+  setTimeout(() => anim.remove(), 1200);
+}
+
+/* ===== UNDO TOAST ===== */
+let undoTimeout = null;
+
+function showUndoToast(onUndo, onCommit) {
+  const toast = document.getElementById('undo-toast');
+  const bar   = document.getElementById('toast-progress-bar');
+  let undoBtn = document.getElementById('toast-undo-btn');
+
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  toast.classList.remove('hidden');
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    bar.style.transition = 'width 10s linear';
+    bar.style.width = '0%';
+  }));
+
+  if (undoTimeout) clearTimeout(undoTimeout);
+  undoTimeout = setTimeout(async () => {
+    toast.classList.add('hidden');
+    await onCommit();
+  }, 10000);
+
+  const fresh = undoBtn.cloneNode(true);
+  undoBtn.parentNode.replaceChild(fresh, undoBtn);
+  fresh.addEventListener('click', async () => {
+    clearTimeout(undoTimeout);
+    toast.classList.add('hidden');
+    await onUndo();
+  });
+}
+
+function dismissToast() {
+  if (undoTimeout) clearTimeout(undoTimeout);
+  document.getElementById('undo-toast').classList.add('hidden');
+}
+
+/* ===== COMPLETE TASK ===== */
+async function completeTask(docId, taskData, anchorEl) {
+  if (pendingComplete) {
+    dismissToast();
+    await commitPendingComplete();
+  }
+
+  if (taskData.stato === 'fallita') {
+    showLateCompleteModal(docId, taskData);
+    return;
+  }
+
+  const coinDelta = taskData.reward;
+  showCoinAnimation(coinDelta, anchorEl);
+  if (navigator.vibrate) navigator.vibrate(100);
+  await updateCoins(coinDelta);
+
+  pendingComplete = { docId, taskData, coinDelta };
+  applyFilter();
+
+  showUndoToast(
+    async () => {
+      await updateCoins(-coinDelta);
+      pendingComplete = null;
+      applyFilter();
+    },
+    async () => { await commitPendingComplete(); }
+  );
+}
+
+async function commitPendingComplete() {
+  if (!pendingComplete) return;
+  const { docId, coinDelta } = pendingComplete;
+  pendingComplete = null;
   try {
-    await db.collection('tasks').doc(id).update({ stato: 'completata' });
-  } catch (err) {
-    alert('Errore: ' + err.message);
+    await db.collection('tasks').doc(docId).update({
+      stato:           'completata',
+      coinAccreditati: coinDelta > 0,
+      completedAt:     firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) {
+    console.error('commitPendingComplete error:', e);
   }
 }
 
-/* ===== FIRESTORE REAL-TIME LISTENER ===== */
+/* ===== LATE COMPLETE MODAL ===== */
+function showLateCompleteModal(docId, taskData) {
+  const overlay = document.getElementById('late-modal-overlay');
+  const panel   = document.getElementById('late-modal-panel');
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => panel.classList.add('open'));
+  document.body.style.overflow = 'hidden';
+
+  const closeLate = () => {
+    panel.classList.remove('open');
+    setTimeout(() => {
+      overlay.classList.add('hidden');
+      document.body.style.overflow = '';
+    }, 300);
+  };
+
+  document.getElementById('btn-late-yes').onclick = async () => {
+    closeLate();
+    const gain = taskData.reward + taskData.penalita;
+    await updateCoins(gain);
+    if (navigator.vibrate) navigator.vibrate(100);
+    await db.collection('tasks').doc(docId).update({
+      stato: 'completata', coinAccreditati: true,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  };
+
+  document.getElementById('btn-late-no').onclick = async () => {
+    closeLate();
+    await db.collection('tasks').doc(docId).update({
+      stato: 'completata', coinAccreditati: false,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  };
+
+  document.getElementById('btn-late-modal-close').onclick = closeLate;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeLate(); }, { once: true });
+}
+
+/* ===== EXPIRY CHECK ===== */
+let expiryInProgress = false;
+
+async function checkExpiredTasks() {
+  if (expiryInProgress) return;
+  expiryInProgress = true;
+  try {
+    const today   = new Date(); today.setHours(0,0,0,0);
+    const expired = allTaskDocs.filter(d => {
+      const t = d.data();
+      if (t.stato !== 'attiva') return false;
+      const s = t.scadenza.toDate(); s.setHours(0,0,0,0);
+      return s < today;
+    });
+    if (!expired.length) return;
+
+    const batch   = db.batch();
+    let   penalty = 0;
+    expired.forEach(doc => {
+      batch.update(doc.ref, { stato: 'fallita' });
+      penalty += doc.data().penalita;
+    });
+    await batch.commit();
+    if (penalty > 0) await updateCoins(-penalty);
+  } finally {
+    expiryInProgress = false;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkExpiredTasks();
+});
+
+/* ===== FIRESTORE LISTENER ===== */
 db.collection('tasks')
-  .where('stato', '==', 'attiva')
-  .orderBy('scadenza', 'asc')
+  .where('stato', 'in', ['attiva', 'fallita'])
   .onSnapshot(snapshot => {
-    allActiveDocs = snapshot.docs;
+    allTaskDocs = snapshot.docs;
+    checkExpiredTasks();
     applyFilter();
   }, err => {
     console.error('Firestore listener error:', err);
   });
+
+/* ===== RESET ===== */
+document.getElementById('btn-reset').addEventListener('click', () => {
+  const overlay = document.getElementById('reset-modal-overlay');
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => document.getElementById('reset-modal-panel').classList.add('open'));
+  document.body.style.overflow = 'hidden';
+});
+
+const closeResetModal = () => {
+  document.getElementById('reset-modal-panel').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('reset-modal-overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+  }, 300);
+};
+
+document.getElementById('btn-reset-cancel').addEventListener('click', closeResetModal);
+document.getElementById('reset-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('reset-modal-overlay')) closeResetModal();
+});
+
+document.getElementById('btn-reset-confirm').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-reset-confirm');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Reset…';
+  try {
+    const snap  = await db.collection('tasks').get();
+    const batch = db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    await db.collection('settings').doc('user').set({ coins: 0 });
+  } catch (e) {
+    console.error('Reset error:', e);
+  }
+  window.location.reload();
+});
+
+/* ===== SETTINGS DATETIME ===== */
+const GIORNI_IT = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+const MESI_IT   = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio',
+                   'agosto','settembre','ottobre','novembre','dicembre'];
+
+function updateDatetime() {
+  const elDate = document.getElementById('datetime-display');
+  const elTz   = document.getElementById('timezone-display');
+  if (!elDate) return;
+  const now = new Date();
+  const hh  = String(now.getHours()).padStart(2,'0');
+  const mm  = String(now.getMinutes()).padStart(2,'0');
+  const ss  = String(now.getSeconds()).padStart(2,'0');
+  elDate.textContent = `${GIORNI_IT[now.getDay()]} ${now.getDate()} ${MESI_IT[now.getMonth()]} ${now.getFullYear()} — ${hh}:${mm}:${ss}`;
+  const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const offset = -now.getTimezoneOffset();
+  const sign   = offset >= 0 ? '+' : '-';
+  const oh     = Math.floor(Math.abs(offset) / 60);
+  const om     = Math.abs(offset) % 60;
+  elTz.textContent = `${tzName} UTC${sign}${oh}${om ? ':' + String(om).padStart(2,'0') : ''}`;
+}
+
+setInterval(updateDatetime, 1000);
+updateDatetime();
+
+/* ===== CHANGELOG MODAL ===== */
+document.getElementById('btn-changelog').addEventListener('click', () => {
+  const overlay = document.getElementById('changelog-overlay');
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => document.getElementById('changelog-panel').classList.add('open'));
+  document.body.style.overflow = 'hidden';
+});
+
+const closeChangelog = () => {
+  document.getElementById('changelog-panel').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('changelog-overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+  }, 300);
+};
+
+document.getElementById('btn-changelog-close').addEventListener('click', closeChangelog);
+document.getElementById('changelog-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('changelog-overlay')) closeChangelog();
+});
 
 /* ===== SERVICE WORKER ===== */
 if ('serviceWorker' in navigator) {

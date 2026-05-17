@@ -61,13 +61,24 @@
 
     <!-- IMPOSTAZIONI -->
     <section id="section-impostazioni" class="section">
-      <div class="section-placeholder">
-        <div class="placeholder-icon">⚙️</div>
-        <h2>Impostazioni</h2>
-        <p class="placeholder-sub">In arrivo: tema, statistiche globali e reset dati</p>
+
+      <div class="card settings-datetime-card">
+        <div id="datetime-display" class="datetime-display">—</div>
+        <div id="timezone-display" class="timezone-display">—</div>
       </div>
 
-      <!-- Firebase test card — visibile solo in questa sezione -->
+      <div class="settings-group">
+        <button class="settings-row" id="btn-changelog">
+          <span class="settings-row-label">📋 Novità e versioni</span>
+          <span class="settings-row-arrow">›</span>
+        </button>
+        <button class="settings-row settings-row-danger" id="btn-reset">
+          <span class="settings-row-label">🗑️ Reset completo</span>
+          <span class="settings-row-arrow">›</span>
+        </button>
+      </div>
+
+      <!-- Firebase test card -->
       <div class="card firebase-test-card">
         <h3 class="card-title">🔌 Test connessione Firebase</h3>
         <p id="firebase-status" class="status-idle">In attesa di test…</p>
@@ -77,6 +88,9 @@
     </section>
 
   </main>
+
+  <!-- ===== VERSION BADGE ===== -->
+  <div class="version-badge">V4</div>
 
   <!-- ===== FAB ===== -->
   <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
@@ -171,6 +185,95 @@
       <span class="nav-label">Impostazioni</span>
     </button>
   </nav>
+
+  <!-- ===== UNDO TOAST ===== -->
+  <div id="undo-toast" class="undo-toast hidden">
+    <div class="toast-content">
+      <span class="toast-msg">Task completata ✓</span>
+      <button id="toast-undo-btn" class="toast-undo-btn">Annulla</button>
+    </div>
+    <div class="toast-progress-track">
+      <div id="toast-progress-bar" class="toast-progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- ===== LATE COMPLETE MODAL ===== -->
+  <div id="late-modal-overlay" class="modal-overlay hidden">
+    <div id="late-modal-panel" class="modal-panel modal-panel-sm">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">⏰ Task scaduta</h2>
+      <div class="modal-body">
+        <p class="modal-text">Avevi completato questa task in tempo?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-late-modal-close" class="btn btn-ghost">✕</button>
+        <button id="btn-late-no" class="btn btn-ghost">No, era in ritardo</button>
+        <button id="btn-late-yes" class="btn btn-primary">Sì, era in tempo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RESET CONFIRM MODAL ===== -->
+  <div id="reset-modal-overlay" class="modal-overlay hidden">
+    <div id="reset-modal-panel" class="modal-panel modal-panel-sm">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">⚠️ Reset completo</h2>
+      <div class="modal-body">
+        <p class="modal-text">Sei sicuro? Questa azione cancellerà tutte le task, azzererà il saldo e resetterà tutte le statistiche. <strong>Non è reversibile.</strong></p>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-reset-cancel" class="btn btn-ghost">Annulla</button>
+        <button id="btn-reset-confirm" class="btn btn-danger">Reset tutto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CHANGELOG MODAL ===== -->
+  <div id="changelog-overlay" class="modal-overlay hidden">
+    <div id="changelog-panel" class="modal-panel">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">📋 Novità e versioni</h2>
+      <div class="modal-body changelog-body">
+        <div class="changelog-block">
+          <p class="changelog-version">V4 — Blocco 4</p>
+          <ul class="changelog-items">
+            <li>Logica monete completa</li>
+            <li>Annullamento completamento (10 sec)</li>
+            <li>Controllo scadenze automatico a mezzanotte</li>
+            <li>Ordine smart task per urgenza</li>
+            <li>Reset completo dalle impostazioni</li>
+            <li>Data e ora dispositivo nelle impostazioni</li>
+          </ul>
+        </div>
+        <div class="changelog-block">
+          <p class="changelog-version">V3 — Blocco 3</p>
+          <ul class="changelog-items">
+            <li>PWA installabile su mobile</li>
+            <li>Ottimizzazione touch e mobile</li>
+            <li>Filtri Tutte / Oggi / Domani</li>
+          </ul>
+        </div>
+        <div class="changelog-block">
+          <p class="changelog-version">V2 — Blocco 2</p>
+          <ul class="changelog-items">
+            <li>Creazione task con form completo</li>
+            <li>Quadratini reward e penalità</li>
+            <li>Salvataggio su Firestore</li>
+          </ul>
+        </div>
+        <div class="changelog-block">
+          <p class="changelog-version">V1 — Blocco 1</p>
+          <ul class="changelog-items">
+            <li>Setup base e connessione Firebase</li>
+            <li>Struttura app e tema dark</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-changelog-close" class="btn btn-ghost" style="flex:1">Chiudi</button>
+      </div>
+    </div>
+  </div>
 
   <script src="firebase-config.js"></script>
   <script src="app.js"></script>
