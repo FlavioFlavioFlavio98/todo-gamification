@@ -32,10 +32,10 @@
 
     <!-- HOME -->
     <section id="section-home" class="section active">
-      <div class="section-placeholder">
-        <div class="placeholder-icon">🏠</div>
-        <h2>Home — Task</h2>
-        <p class="placeholder-sub">In arrivo: lista task con scadenze, priorità e monete</p>
+      <div id="task-list" class="task-list"></div>
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-icon">⚔️</div>
+        <p>Nessuna quest attiva.<br>Premi + per aggiungerne una.</p>
       </div>
     </section>
 
@@ -66,6 +66,84 @@
     </section>
 
   </main>
+
+  <!-- ===== FAB ===== -->
+  <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
+
+  <!-- ===== MODAL ===== -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div id="modal-panel" class="modal-panel">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Nuova Quest</h2>
+
+      <div class="modal-body">
+
+        <div class="form-group">
+          <label class="form-label">Nome task <span class="required">*</span></label>
+          <input id="f-nome" type="text" class="form-input" placeholder="Es. Studia per l'esame…" maxlength="80" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descrizione <span class="optional">(opzionale)</span></label>
+          <textarea id="f-desc" class="form-textarea" placeholder="Dettagli…" rows="2" maxlength="300"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Data scadenza <span class="required">*</span></label>
+          <div id="f-date-display" class="date-display" role="button" tabindex="0">📅 Seleziona una data</div>
+          <div id="cal-widget" class="cal-widget hidden">
+            <div class="cal-header">
+              <button id="cal-prev" class="cal-nav">‹</button>
+              <span id="cal-month-label" class="cal-month-label"></span>
+              <button id="cal-next" class="cal-nav">›</button>
+            </div>
+            <div class="cal-day-names">
+              <span>Lun</span><span>Mar</span><span>Mer</span>
+              <span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span>
+            </div>
+            <div id="cal-grid" class="cal-grid"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label coin-label green">💰 Coin se completi in tempo <span class="required">*</span></label>
+          <div class="coin-selector" id="sel-reward">
+            <button class="coin-sq" data-val="1">1</button>
+            <button class="coin-sq" data-val="2">2</button>
+            <button class="coin-sq" data-val="3">3</button>
+            <button class="coin-sq" data-val="4">4</button>
+            <button class="coin-sq" data-val="5">5</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label coin-label red">💀 Coin perse se scade <span class="required">*</span></label>
+          <div class="coin-selector" id="sel-penalty">
+            <button class="coin-sq" data-val="1">1</button>
+            <button class="coin-sq" data-val="2">2</button>
+            <button class="coin-sq" data-val="3">3</button>
+            <button class="coin-sq" data-val="4">4</button>
+            <button class="coin-sq" data-val="5">5</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Priorità <span class="required">*</span></label>
+          <div class="priority-selector">
+            <button class="priority-btn" data-val="alta">🔴 Alta</button>
+            <button class="priority-btn" data-val="media">🟠 Media</button>
+            <button class="priority-btn" data-val="bassa">🔵 Bassa</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-cancel" class="btn btn-ghost">Annulla</button>
+        <button id="btn-create" class="btn btn-primary">Crea Task</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===== BOTTOM NAV ===== -->
   <nav class="bottom-nav">
