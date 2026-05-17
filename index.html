@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Todo Gamification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="app-header">
+    <div class="header-inner">
+      <span class="app-logo">⚔️</span>
+      <h1 class="app-title">QuestList</h1>
+      <div class="coin-display">
+        <span class="coin-icon">🪙</span>
+        <span id="coin-count">—</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="main-content">
+
+    <!-- HOME -->
+    <section id="section-home" class="section active">
+      <div class="section-placeholder">
+        <div class="placeholder-icon">🏠</div>
+        <h2>Home — Task</h2>
+        <p class="placeholder-sub">In arrivo: lista task con scadenze, priorità e monete</p>
+      </div>
+    </section>
+
+    <!-- STORICO -->
+    <section id="section-storico" class="section">
+      <div class="section-placeholder">
+        <div class="placeholder-icon">📋</div>
+        <h2>Storico</h2>
+        <p class="placeholder-sub">In arrivo: task completate e fallite con riepilogo monete</p>
+      </div>
+    </section>
+
+    <!-- IMPOSTAZIONI -->
+    <section id="section-impostazioni" class="section">
+      <div class="section-placeholder">
+        <div class="placeholder-icon">⚙️</div>
+        <h2>Impostazioni</h2>
+        <p class="placeholder-sub">In arrivo: tema, statistiche globali e reset dati</p>
+      </div>
+
+      <!-- Firebase test card — visibile solo in questa sezione -->
+      <div class="card firebase-test-card">
+        <h3 class="card-title">🔌 Test connessione Firebase</h3>
+        <p id="firebase-status" class="status-idle">In attesa di test…</p>
+        <button id="btn-test-firebase" class="btn btn-primary">Esegui test</button>
+        <div id="firebase-result" class="firebase-result hidden"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-section="home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Home</span>
+    </button>
+    <button class="nav-item" data-section="storico">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Storico</span>
+    </button>
+    <button class="nav-item" data-section="impostazioni">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Impostazioni</span>
+    </button>
+  </nav>
+
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
