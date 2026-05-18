@@ -74,6 +74,109 @@
       </div>
     </section>
 
+    <!-- STATISTICHE -->
+    <section id="section-statistiche" class="section">
+
+      <!-- A: Level card -->
+      <div class="card level-card">
+        <div class="level-top">
+          <div class="level-badge-wrap">
+            <span id="stat-level-num" class="level-num">1</span>
+          </div>
+          <div class="level-info">
+            <p id="stat-level-name" class="level-name">Novizio</p>
+            <p id="stat-level-xp" class="level-xp">0 / 25 coin</p>
+          </div>
+        </div>
+        <div class="level-bar-track">
+          <div id="stat-level-bar" class="level-bar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- B: Streak & activity -->
+      <div class="stats-grid-2x2">
+        <div class="stat-card">
+          <span class="stat-card-icon">🔥</span>
+          <span id="stat-streak" class="stat-card-value">0</span>
+          <span class="stat-card-label">Streak attuale</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card-icon">🏆</span>
+          <span id="stat-max-streak" class="stat-card-value">0</span>
+          <span class="stat-card-label">Streak record</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card-icon">📱</span>
+          <span id="stat-openings" class="stat-card-value">0</span>
+          <span class="stat-card-label">Accessi totali</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card-icon">📅</span>
+          <span id="stat-active-days" class="stat-card-value">0</span>
+          <span class="stat-card-label">Giorni attivi</span>
+        </div>
+      </div>
+
+      <!-- C: Task stats -->
+      <div class="stats-grid-2x2">
+        <div class="stat-card stat-card-green">
+          <span class="stat-card-icon">✅</span>
+          <span id="stat-completed" class="stat-card-value">0</span>
+          <span class="stat-card-label">Completate</span>
+        </div>
+        <div class="stat-card stat-card-red">
+          <span class="stat-card-icon">❌</span>
+          <span id="stat-failed" class="stat-card-value">0</span>
+          <span class="stat-card-label">Fallite</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-card-icon">📊</span>
+          <span id="stat-total" class="stat-card-value">0</span>
+          <span class="stat-card-label">Totale task</span>
+        </div>
+        <div class="stat-card stat-card-accent">
+          <span class="stat-card-icon">🎯</span>
+          <span id="stat-rate" class="stat-card-value">—</span>
+          <span class="stat-card-label">Tasso successo</span>
+        </div>
+      </div>
+
+      <!-- D: Weekly stats -->
+      <div class="card week-stats-card">
+        <p class="card-title">📆 Questa settimana</p>
+        <div class="week-stats-row">
+          <div class="week-stat">
+            <span id="stat-week-completed" class="week-stat-val">0</span>
+            <span class="week-stat-label">completate</span>
+          </div>
+          <div class="week-stat-divider"></div>
+          <div class="week-stat">
+            <span id="stat-week-coins" class="week-stat-val week-stat-val-yellow">0</span>
+            <span class="week-stat-label">coin guadagnate</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- E: Coin chart -->
+      <div class="card">
+        <p class="card-title">🪙 Coin ultimi 7 giorni</p>
+        <div id="coin-chart" class="coin-chart"></div>
+      </div>
+
+      <!-- F: Heatmap -->
+      <div class="card">
+        <p class="card-title">🗓️ Attività ultimi 90 giorni</p>
+        <div id="heatmap-grid" class="heatmap-grid"></div>
+      </div>
+
+      <!-- G: Badges -->
+      <div class="card">
+        <p class="card-title">🏅 Badge</p>
+        <div id="badges-grid" class="badges-grid"></div>
+      </div>
+
+    </section>
+
     <!-- IMPOSTAZIONI -->
     <section id="section-impostazioni" class="section">
 
@@ -109,7 +212,7 @@
   </main>
 
   <!-- ===== VERSION BADGE ===== -->
-  <div class="version-badge">V5</div>
+  <div class="version-badge">V6</div>
 
   <!-- ===== FAB ===== -->
   <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
@@ -199,6 +302,10 @@
       <span class="nav-icon">📋</span>
       <span class="nav-label">Storico</span>
     </button>
+    <button class="nav-item" data-section="statistiche">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Statistiche</span>
+    </button>
     <button class="nav-item" data-section="impostazioni">
       <span class="nav-icon">⚙️</span>
       <span class="nav-label">Impostazioni</span>
@@ -237,6 +344,22 @@
     </div>
   </div>
 
+  <!-- ===== BADGE UNLOCK MODAL ===== -->
+  <div id="badge-modal-overlay" class="modal-overlay hidden">
+    <div id="badge-modal-panel" class="modal-panel modal-panel-sm">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">🏅 Badge sbloccato!</h2>
+      <div class="modal-body" style="align-items:center;text-align:center;gap:8px">
+        <div id="badge-modal-icon" class="badge-unlock-icon"></div>
+        <p id="badge-modal-name" class="badge-unlock-name"></p>
+        <p id="badge-modal-desc" class="badge-unlock-desc"></p>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-badge-modal-close" class="btn btn-primary" style="flex:1">🎉 Fantastico!</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== RESET CONFIRM MODAL ===== -->
   <div id="reset-modal-overlay" class="modal-overlay hidden">
     <div id="reset-modal-panel" class="modal-panel modal-panel-sm">
@@ -258,6 +381,17 @@
       <div class="modal-handle"></div>
       <h2 class="modal-title">📋 Novità e versioni</h2>
       <div class="modal-body changelog-body">
+        <div class="changelog-block">
+          <p class="changelog-version">V6 — Blocco 6</p>
+          <ul class="changelog-items">
+            <li>Sezione Statistiche completa con 7 blocchi</li>
+            <li>Sistema livelli (10 livelli) basato su coin guadagnate</li>
+            <li>Streak giornaliero e attività (heatmap 90 giorni)</li>
+            <li>Grafico coin ultimi 7 giorni</li>
+            <li>12 badge sbloccabili con animazione</li>
+            <li>Statistiche settimanali e tasso di successo</li>
+          </ul>
+        </div>
         <div class="changelog-block">
           <p class="changelog-version">V5 — Blocco 5</p>
           <ul class="changelog-items">

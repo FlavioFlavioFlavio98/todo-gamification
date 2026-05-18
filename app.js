@@ -283,22 +283,28 @@ function escapeHtml(str) {
 
 /* ===== COIN BALANCE ===== */
 let coinBalance = 0;
+let userSettings = {};
 
 db.collection('settings').doc('user').onSnapshot(snap => {
   if (snap.exists) {
-    coinBalance = snap.data().coins ?? 0;
+    userSettings = snap.data();
+    coinBalance = userSettings.coins ?? 0;
   } else {
+    userSettings = {};
     coinBalance = 0;
     db.collection('settings').doc('user').set({ coins: 0 });
   }
   setCoinDisplay(coinBalance);
+  renderStats();
 });
 
 async function updateCoins(delta) {
   coinBalance += delta;
   setCoinDisplay(coinBalance);
   try {
-    await db.collection('settings').doc('user').set({ coins: coinBalance }, { merge: true });
+    const update = { coins: coinBalance };
+    if (delta > 0) update.coinsEarned = firebase.firestore.FieldValue.increment(delta);
+    await db.collection('settings').doc('user').set(update, { merge: true });
   } catch (e) {
     console.error('updateCoins error:', e);
   }
@@ -509,6 +515,12 @@ async function commitPendingComplete() {
       coinAccreditati: coinDelta > 0,
       completedAt:     firebase.firestore.FieldValue.serverTimestamp()
     });
+    if (coinDelta > 0) {
+      await db.collection('settings').doc('user').set(
+        { consecutiveCompleted: firebase.firestore.FieldValue.increment(1) },
+        { merge: true }
+      );
+    }
   } catch (e) {
     console.error('commitPendingComplete error:', e);
   }
@@ -576,6 +588,7 @@ async function checkExpiredTasks() {
       penalty += doc.data().penalita;
     });
     await batch.commit();
+    await db.collection('settings').doc('user').set({ consecutiveCompleted: 0 }, { merge: true });
     if (penalty > 0) await updateCoins(-penalty);
   } finally {
     expiryInProgress = false;
@@ -627,7 +640,13 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
     const batch = db.batch();
     snap.docs.forEach(d => batch.delete(d.ref));
     await batch.commit();
-    await db.collection('settings').doc('user').set({ coins: 0 });
+    await db.collection('settings').doc('user').set({
+      coins: 0, coinsEarned: 0,
+      totalOpenings: 0, dailyOpenings: 0,
+      streak: 0, maxStreak: 0,
+      lastOpenDate: null, activeDays: [],
+      unlockedBadges: [], consecutiveCompleted: 0
+    });
   } catch (e) {
     console.error('Reset error:', e);
   }
@@ -768,6 +787,7 @@ db.collection('tasks')
   .onSnapshot(snapshot => {
     storicoDocs = snapshot.docs;
     renderStorico();
+    renderStats();
   }, err => {
     console.error('Storico listener error:', err);
   });
@@ -806,4 +826,273 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/todo-gamification/sw.js')
       .catch(err => console.warn('SW non registrato (funziona solo su HTTPS o localhost):', err));
   });
+}
+
+/* ===== RECORD OPENING ===== */
+async function recordOpening() {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().slice(0, 10);
+  try {
+    const snap = await db.collection('settings').doc('user').get();
+    const data = snap.exists ? snap.data() : {};
+
+    const lastOpenDate  = data.lastOpenDate ?? null;
+    const streak        = data.streak ?? 0;
+    const maxStreak     = data.maxStreak ?? 0;
+    const totalOpenings = (data.totalOpenings ?? 0) + 1;
+
+    if (lastOpenDate === todayStr) {
+      await db.collection('settings').doc('user').set(
+        { totalOpenings, dailyOpenings: firebase.firestore.FieldValue.increment(1) },
+        { merge: true }
+      );
+      return;
+    }
+
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    const newStreak    = lastOpenDate === yesterdayStr ? streak + 1 : 1;
+    const newMaxStreak = Math.max(newStreak, maxStreak);
+
+    let activeDays = [...(data.activeDays ?? [])];
+    if (!activeDays.includes(todayStr)) activeDays.push(todayStr);
+    const cutoff = new Date(today); cutoff.setDate(today.getDate() - 89);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    activeDays = activeDays.filter(d => d >= cutoffStr);
+
+    await db.collection('settings').doc('user').set({
+      totalOpenings, dailyOpenings: 1,
+      streak: newStreak, maxStreak: newMaxStreak,
+      lastOpenDate: todayStr, activeDays
+    }, { merge: true });
+  } catch (e) {
+    console.error('recordOpening error:', e);
+  }
+}
+
+recordOpening();
+
+/* ===== LEVELS & BADGES ===== */
+const LEVELS = [
+  { level: 1,  name: 'Novizio',          min: 0    },
+  { level: 2,  name: 'Apprendista',      min: 25   },
+  { level: 3,  name: 'Avventuriero',     min: 75   },
+  { level: 4,  name: 'Guerriero',        min: 150  },
+  { level: 5,  name: 'Campione',         min: 300  },
+  { level: 6,  name: 'Maestro',          min: 500  },
+  { level: 7,  name: 'Leggenda',         min: 800  },
+  { level: 8,  name: 'Mito',             min: 1200 },
+  { level: 9,  name: 'Immortale',        min: 1800 },
+  { level: 10, name: 'Dio delle Quest',  min: 2500 }
+];
+
+const BADGES = [
+  { id: 'first_task', icon: '⚔️', name: 'Prima Quest',       desc: 'Completa la tua prima task' },
+  { id: 'streak_3',   icon: '🔥', name: 'In Fiamme',         desc: '3 giorni di streak' },
+  { id: 'streak_7',   icon: '🌟', name: 'Settimana Perfetta', desc: '7 giorni di streak' },
+  { id: 'streak_30',  icon: '👑', name: 'Dominatore',        desc: '30 giorni di streak' },
+  { id: 'coins_50',   icon: '💰', name: 'Primo Tesoro',      desc: 'Guadagna 50 coin totali' },
+  { id: 'coins_200',  icon: '💎', name: 'Ricco Sfondato',    desc: 'Guadagna 200 coin totali' },
+  { id: 'coins_500',  icon: '🏦', name: 'Banchiere',         desc: 'Guadagna 500 coin totali' },
+  { id: 'tasks_10',   icon: '📜', name: 'Veterano',          desc: 'Completa 10 task in tempo' },
+  { id: 'tasks_50',   icon: '🗡️', name: 'Gladiatore',        desc: 'Completa 50 task in tempo' },
+  { id: 'no_fail',    icon: '🛡️', name: 'Senza Macchia',     desc: 'Completa 5 task di fila senza fallirne nessuna' },
+  { id: 'level_5',    icon: '⭐', name: 'Metà Strada',       desc: 'Raggiungi il livello 5' },
+  { id: 'level_10',   icon: '🔱', name: 'Asceso',            desc: 'Raggiungi il livello 10' },
+];
+
+const shownBadges = new Set();
+
+/* ===== RENDER STATS ===== */
+function renderStats() {
+  if (!document.getElementById('stat-level-num')) return;
+
+  const s             = userSettings;
+  const completedDocs = storicoDocs.filter(d => d.data().stato === 'completata');
+  const failedDocs    = storicoDocs.filter(d => d.data().stato === 'fallita');
+
+  const coinsEarned = s.coinsEarned ?? 0;
+  const streak      = s.streak ?? 0;
+  const maxStreak   = s.maxStreak ?? 0;
+  const totalOpen   = s.totalOpenings ?? 0;
+  const activeDays  = s.activeDays ?? [];
+
+  // Level
+  let lvl = LEVELS[0], nextLvl = LEVELS[1];
+  for (let i = LEVELS.length - 1; i >= 0; i--) {
+    if (coinsEarned >= LEVELS[i].min) { lvl = LEVELS[i]; nextLvl = LEVELS[i + 1] || null; break; }
+  }
+  document.getElementById('stat-level-num').textContent  = lvl.level;
+  document.getElementById('stat-level-name').textContent = lvl.name;
+  if (nextLvl) {
+    const pct = Math.round(((coinsEarned - lvl.min) / (nextLvl.min - lvl.min)) * 100);
+    document.getElementById('stat-level-xp').textContent  = `${coinsEarned} / ${nextLvl.min} coin`;
+    document.getElementById('stat-level-bar').style.width = Math.min(pct, 100) + '%';
+  } else {
+    document.getElementById('stat-level-xp').textContent  = `${coinsEarned} coin — Livello massimo!`;
+    document.getElementById('stat-level-bar').style.width = '100%';
+  }
+
+  // Streak / activity
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('stat-streak',      streak);
+  setEl('stat-max-streak',  maxStreak);
+  setEl('stat-openings',    totalOpen);
+  setEl('stat-active-days', activeDays.length);
+
+  // Task stats
+  const total = completedDocs.length + failedDocs.length;
+  setEl('stat-completed', completedDocs.length);
+  setEl('stat-failed',    failedDocs.length);
+  setEl('stat-total',     total);
+  setEl('stat-rate',      total > 0 ? Math.round((completedDocs.length / total) * 100) + '%' : '—');
+
+  // Weekly stats (Mon–Sun of current week)
+  const monday = new Date(); monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const weekDocs  = completedDocs.filter(d => {
+    const ref = d.data().completedAt || d.data().scadenza;
+    return ref.toDate() >= monday;
+  });
+  const weekCoins = weekDocs.reduce((sum, d) => sum + (d.data().reward || 0), 0);
+  setEl('stat-week-completed', weekDocs.length);
+  setEl('stat-week-coins',     weekCoins);
+
+  renderCoinChart(completedDocs);
+  renderHeatmap(completedDocs);
+  renderBadges(s, completedDocs, lvl.level);
+}
+
+function renderCoinChart(completedDocs) {
+  const el = document.getElementById('coin-chart');
+  if (!el) return;
+
+  const today  = new Date(); today.setHours(0, 0, 0, 0);
+  const labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+
+  const data = [];
+  for (let i = 6; i >= 0; i--) {
+    const day     = new Date(today); day.setDate(today.getDate() - i);
+    const nextDay = new Date(day);   nextDay.setDate(day.getDate() + 1);
+    const coins   = completedDocs
+      .filter(doc => { const t = (doc.data().completedAt || doc.data().scadenza).toDate(); return t >= day && t < nextDay; })
+      .reduce((s, doc) => s + (doc.data().reward || 0), 0);
+    data.push({ day, coins });
+  }
+
+  const maxCoins = Math.max(...data.map(d => d.coins), 1);
+
+  el.innerHTML = data.map(d => {
+    const pct      = Math.round((d.coins / maxCoins) * 100);
+    const dayLabel = labels[(d.day.getDay() + 6) % 7];
+    const isToday  = d.day.toDateString() === today.toDateString();
+    return `
+      <div class="coin-bar-col">
+        <span class="coin-bar-val">${d.coins > 0 ? d.coins : ''}</span>
+        <div class="coin-bar-wrap">
+          <div class="coin-bar${isToday ? ' coin-bar-today' : ''}" style="height:${pct}%"></div>
+        </div>
+        <span class="coin-bar-label${isToday ? ' coin-bar-label-today' : ''}">${dayLabel}</span>
+      </div>`;
+  }).join('');
+}
+
+function renderHeatmap(completedDocs) {
+  const el = document.getElementById('heatmap-grid');
+  if (!el) return;
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  const countMap = {};
+  completedDocs.forEach(doc => {
+    const d = (doc.data().completedAt || doc.data().scadenza).toDate();
+    d.setHours(0, 0, 0, 0);
+    const key = d.toISOString().slice(0, 10);
+    countMap[key] = (countMap[key] || 0) + 1;
+  });
+
+  const start = new Date(today); start.setDate(today.getDate() - 89);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // align to Monday
+
+  const cells = [];
+  const cursor = new Date(start);
+  while (cursor <= today) {
+    const key   = cursor.toISOString().slice(0, 10);
+    cells.push({ key, count: countMap[key] || 0 });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const maxCount = Math.max(...cells.map(c => c.count), 1);
+  el.innerHTML = cells.map(c => {
+    const intensity = c.count > 0 ? Math.ceil((c.count / maxCount) * 4) : 0;
+    return `<div class="heatmap-cell heatmap-${intensity}" title="${c.key}: ${c.count} task"></div>`;
+  }).join('');
+}
+
+function renderBadges(s, completedDocs, level) {
+  const el = document.getElementById('badges-grid');
+  if (!el) return;
+
+  const unlockedBadges        = s.unlockedBadges ?? [];
+  const streak                = s.streak ?? 0;
+  const coinsEarned           = s.coinsEarned ?? 0;
+  const consecutiveCompleted  = s.consecutiveCompleted ?? 0;
+  const completed             = completedDocs.length;
+
+  const checks = {
+    first_task: completed >= 1,
+    streak_3:   streak >= 3,
+    streak_7:   streak >= 7,
+    streak_30:  streak >= 30,
+    coins_50:   coinsEarned >= 50,
+    coins_200:  coinsEarned >= 200,
+    coins_500:  coinsEarned >= 500,
+    tasks_10:   completed >= 10,
+    tasks_50:   completed >= 50,
+    no_fail:    consecutiveCompleted >= 5,
+    level_5:    level >= 5,
+    level_10:   level >= 10,
+  };
+
+  const newlyUnlocked = BADGES.filter(b => checks[b.id] && !unlockedBadges.includes(b.id));
+
+  if (newlyUnlocked.length > 0) {
+    const allUnlocked = [...unlockedBadges, ...newlyUnlocked.map(b => b.id)];
+    db.collection('settings').doc('user').set({ unlockedBadges: allUnlocked }, { merge: true });
+    newlyUnlocked.forEach(b => {
+      if (!shownBadges.has(b.id)) {
+        shownBadges.add(b.id);
+        setTimeout(() => showBadgeModal(b), 600);
+      }
+    });
+  }
+
+  const allUnlocked = [...unlockedBadges, ...newlyUnlocked.map(b => b.id)];
+  el.innerHTML = BADGES.map(b => {
+    const unlocked = allUnlocked.includes(b.id);
+    return `
+      <div class="badge-item${unlocked ? '' : ' badge-item-locked'}" title="${b.desc}">
+        <span class="badge-icon">${b.icon}</span>
+        <span class="badge-name">${b.name}</span>
+      </div>`;
+  }).join('');
+}
+
+function showBadgeModal(badge) {
+  const overlay = document.getElementById('badge-modal-overlay');
+  const panel   = document.getElementById('badge-modal-panel');
+  document.getElementById('badge-modal-icon').textContent = badge.icon;
+  document.getElementById('badge-modal-name').textContent = badge.name;
+  document.getElementById('badge-modal-desc').textContent = badge.desc;
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => panel.classList.add('open'));
+  document.body.style.overflow = 'hidden';
+
+  const close = () => {
+    panel.classList.remove('open');
+    setTimeout(() => { overlay.classList.add('hidden'); document.body.style.overflow = ''; }, 300);
+  };
+  document.getElementById('btn-badge-modal-close').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); }, { once: true });
 }
