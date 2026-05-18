@@ -680,6 +680,126 @@ document.getElementById('changelog-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('changelog-overlay')) closeChangelog();
 });
 
+/* ===== STORICO ===== */
+let storicoDocs   = [];
+let storicoFilter = 'tutte';
+
+function renderStorico() {
+  const list    = document.getElementById('storico-list');
+  const empty   = document.getElementById('storico-empty');
+  const earnEl  = document.getElementById('storico-earned');
+  const lostEl  = document.getElementById('storico-lost');
+  if (!list) return;
+
+  // Counters (always over all docs, ignoring current tab)
+  const totalEarned = storicoDocs
+    .filter(d => d.data().stato === 'completata')
+    .reduce((s, d) => s + (d.data().reward || 0), 0);
+  const totalLost = storicoDocs
+    .filter(d => d.data().stato === 'fallita')
+    .reduce((s, d) => s + (d.data().penalita || 0), 0);
+  earnEl.textContent = `${totalEarned} coin`;
+  lostEl.textContent = `${totalLost} coin`;
+
+  // Apply tab filter
+  let filtered = [...storicoDocs];
+  if (storicoFilter === 'completate') filtered = filtered.filter(d => d.data().stato === 'completata');
+  if (storicoFilter === 'fallite')    filtered = filtered.filter(d => d.data().stato === 'fallita');
+
+  // Sort: most recent first (completedAt, fallback to scadenza)
+  filtered.sort((a, b) => {
+    const ts = d => ((d.data().completedAt || d.data().scadenza).toDate()).getTime();
+    return ts(b) - ts(a);
+  });
+
+  list.innerHTML = '';
+
+  if (filtered.length === 0) {
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  filtered.forEach(doc => {
+    const t         = doc.data();
+    const completed = t.stato === 'completata';
+    const dateRef   = t.completedAt || t.scadenza;
+    const card      = document.createElement('div');
+    card.className  = `history-card ${completed ? 'history-card-ok' : 'history-card-fail'}`;
+    card.innerHTML  = `
+      <div class="history-card-top">
+        <span class="task-name">${escapeHtml(t.nome)}</span>
+        <span class="priority-dot priority-${t.priorita}"></span>
+      </div>
+      <div class="history-card-bottom">
+        <span class="task-date">📅 ${formatDateIT(dateRef)}</span>
+        <span class="pill ${completed ? 'pill-green' : 'pill-red'}">
+          ${completed ? `💰 +${t.reward}` : `💀 -${t.penalita}`}
+        </span>
+        <button class="btn-delete-history" data-id="${doc.id}" title="Elimina voce">🗑️</button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+
+  list.querySelectorAll('.btn-delete-history').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        await db.collection('tasks').doc(btn.dataset.id).delete();
+        showInfoToast('Voce eliminata');
+      } catch (e) {
+        console.error('Delete history error:', e);
+      }
+    });
+  });
+}
+
+document.querySelectorAll('[data-storico-filter]').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('[data-storico-filter]').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    storicoFilter = chip.dataset.storicoFilter;
+    renderStorico();
+  });
+});
+
+db.collection('tasks')
+  .where('stato', 'in', ['completata', 'fallita'])
+  .onSnapshot(snapshot => {
+    storicoDocs = snapshot.docs;
+    renderStorico();
+  }, err => {
+    console.error('Storico listener error:', err);
+  });
+
+/* ===== INFO TOAST ===== */
+let infoToastTimeout = null;
+
+function showInfoToast(msg) {
+  const toast = document.getElementById('info-toast');
+  document.getElementById('info-toast-msg').textContent = msg;
+  toast.classList.remove('hidden');
+  if (infoToastTimeout) clearTimeout(infoToastTimeout);
+  infoToastTimeout = setTimeout(() => toast.classList.add('hidden'), 2500);
+}
+
+/* ===== CHECK UPDATES ===== */
+document.getElementById('btn-update-check').addEventListener('click', async () => {
+  const label = document.querySelector('#btn-update-check .settings-row-label');
+  label.textContent = '🔄 Pulizia cache…';
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.unregister();
+    }
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  } catch (e) {
+    console.error('Update check error:', e);
+  }
+  window.location.reload(true);
+});
+
 /* ===== SERVICE WORKER ===== */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

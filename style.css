@@ -943,6 +943,106 @@ body {
   color: var(--border);
 }
 
+/* ===== STORICO COUNTERS ===== */
+.storico-counters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.storico-counter {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.storico-counter-green { border-color: #22c55e55; }
+.storico-counter-red   { border-color: #ef444455; }
+
+.counter-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.counter-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.storico-counter-green .counter-value { color: var(--green); }
+.storico-counter-red   .counter-value { color: var(--red); }
+
+/* ===== HISTORY CARDS ===== */
+.history-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.history-card-ok   { border-left-color: var(--green); }
+.history-card-fail { border-left-color: var(--red); }
+
+.history-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.history-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-delete-history {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0.4;
+  flex-shrink: 0;
+  min-width: 34px;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: opacity var(--transition), background var(--transition);
+  margin-left: auto;
+}
+@media (hover: hover) {
+  .btn-delete-history:hover { opacity: 1; background: var(--red-glow); }
+}
+
+/* ===== INFO TOAST ===== */
+.info-toast {
+  position: fixed;
+  bottom: calc(var(--nav-height) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  z-index: 175;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  animation: slideUpToast 0.2s ease;
+}
+.info-toast.hidden { display: none; }
+
 /* ===== RESPONSIVE ===== */
 @media (min-width: 480px) {
   .main-content { padding: 20px; }

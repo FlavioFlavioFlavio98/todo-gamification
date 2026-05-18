@@ -52,10 +52,25 @@
 
     <!-- STORICO -->
     <section id="section-storico" class="section">
-      <div class="section-placeholder">
-        <div class="placeholder-icon">📋</div>
-        <h2>Storico</h2>
-        <p class="placeholder-sub">In arrivo: task completate e fallite con riepilogo monete</p>
+      <div class="storico-counters">
+        <div class="storico-counter storico-counter-green">
+          <span class="counter-label">💰 Totale guadagnate</span>
+          <span id="storico-earned" class="counter-value">0 coin</span>
+        </div>
+        <div class="storico-counter storico-counter-red">
+          <span class="counter-label">💀 Totale perse</span>
+          <span id="storico-lost" class="counter-value">0 coin</span>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-chip active" data-storico-filter="tutte">Tutte</button>
+        <button class="filter-chip" data-storico-filter="completate">✅ Completate</button>
+        <button class="filter-chip" data-storico-filter="fallite">❌ Fallite</button>
+      </div>
+      <div id="storico-list" class="task-list"></div>
+      <div id="storico-empty" class="empty-state hidden">
+        <div class="empty-icon">📋</div>
+        <p>Nessuna voce nello storico.</p>
       </div>
     </section>
 
@@ -70,6 +85,10 @@
       <div class="settings-group">
         <button class="settings-row" id="btn-changelog">
           <span class="settings-row-label">📋 Novità e versioni</span>
+          <span class="settings-row-arrow">›</span>
+        </button>
+        <button class="settings-row" id="btn-update-check">
+          <span class="settings-row-label">🔄 Controlla aggiornamenti</span>
           <span class="settings-row-arrow">›</span>
         </button>
         <button class="settings-row settings-row-danger" id="btn-reset">
@@ -90,7 +109,7 @@
   </main>
 
   <!-- ===== VERSION BADGE ===== -->
-  <div class="version-badge">V4</div>
+  <div class="version-badge">V5</div>
 
   <!-- ===== FAB ===== -->
   <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
@@ -186,6 +205,11 @@
     </button>
   </nav>
 
+  <!-- ===== INFO TOAST ===== -->
+  <div id="info-toast" class="info-toast hidden">
+    <span id="info-toast-msg"></span>
+  </div>
+
   <!-- ===== UNDO TOAST ===== -->
   <div id="undo-toast" class="undo-toast hidden">
     <div class="toast-content">
@@ -234,6 +258,15 @@
       <div class="modal-handle"></div>
       <h2 class="modal-title">📋 Novità e versioni</h2>
       <div class="modal-body changelog-body">
+        <div class="changelog-block">
+          <p class="changelog-version">V5 — Blocco 5</p>
+          <ul class="changelog-items">
+            <li>Sezione Storico completa con tab Completate/Fallite</li>
+            <li>Totale coin guadagnate e perse nello storico</li>
+            <li>Cancellazione singole voci dallo storico</li>
+            <li>Bottone aggiornamenti nelle impostazioni</li>
+          </ul>
+        </div>
         <div class="changelog-block">
           <p class="changelog-version">V4 — Blocco 4</p>
           <ul class="changelog-items">
