@@ -18,8 +18,18 @@ navItems.forEach(item => {
 });
 
 /* ===== COIN DISPLAY ===== */
+let prevCoinBalance = null;
+
 function setCoinDisplay(value) {
-  document.getElementById('coin-count').textContent = value ?? '0';
+  const numVal = value ?? 0;
+  document.getElementById('coin-count').textContent = numVal;
+  if (prevCoinBalance !== null && numVal !== prevCoinBalance) {
+    const disp = document.querySelector('.coin-display');
+    disp.classList.remove('coin-pulse-green', 'coin-pulse-red');
+    void disp.offsetWidth;
+    disp.classList.add(numVal > prevCoinBalance ? 'coin-pulse-green' : 'coin-pulse-red');
+  }
+  prevCoinBalance = numVal;
 }
 
 /* ===== FIREBASE TEST ===== */
@@ -342,6 +352,7 @@ async function updateCoins(delta) {
 /* ===== FILTERS & SMART SORT ===== */
 let allTaskDocs   = [];
 let currentFilter = 'tutte';
+let currentSearch = '';
 let pendingComplete = null;
 
 const emptyMessages = {
@@ -383,15 +394,27 @@ function getFilteredDocs() {
   const skipId = pendingComplete?.docId;
   const docs   = skipId ? allTaskDocs.filter(d => d.id !== skipId) : allTaskDocs;
 
-  if (currentFilter === 'tutte') return smartSort(docs);
+  let result;
+  if (currentFilter === 'tutte') {
+    result = smartSort(docs);
+  } else {
+    const today    = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+    const ref = currentFilter === 'oggi' ? today : tomorrow;
+    result = docs
+      .filter(d => d.data().stato === 'attiva' && isSameDay(d.data().scadenza.toDate(), ref))
+      .sort((a,b) => b.data().reward - a.data().reward);
+  }
 
-  const today    = new Date(); today.setHours(0,0,0,0);
-  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-  const ref = currentFilter === 'oggi' ? today : tomorrow;
-
-  return docs
-    .filter(d => d.data().stato === 'attiva' && isSameDay(d.data().scadenza.toDate(), ref))
-    .sort((a,b) => b.data().reward - a.data().reward);
+  if (currentSearch) {
+    const q = currentSearch.toLowerCase();
+    result = result.filter(d => {
+      const t = d.data();
+      return t.nome.toLowerCase().includes(q) ||
+             (t.descrizione && t.descrizione.toLowerCase().includes(q));
+    });
+  }
+  return result;
 }
 
 function applyFilter() {
@@ -403,6 +426,9 @@ document.querySelectorAll('.filter-chip').forEach(chip => {
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     currentFilter = chip.dataset.filter;
+    currentSearch = '';
+    const sb = document.getElementById('search-bar');
+    if (sb) sb.value = '';
     applyFilter();
   });
 });
@@ -415,9 +441,14 @@ function renderTasks(docs) {
   list.innerHTML  = '';
 
   if (docs.length === 0) {
-    const m = emptyMessages[currentFilter];
-    emptyIcon.textContent = m.icon;
-    emptyMsg.innerHTML    = m.text;
+    if (currentSearch) {
+      emptyIcon.textContent = '🔍';
+      emptyMsg.textContent  = `Nessun risultato per "${currentSearch}"`;
+    } else {
+      const m = emptyMessages[currentFilter];
+      emptyIcon.textContent = m.icon;
+      emptyMsg.innerHTML    = m.text;
+    }
     empty.classList.remove('hidden');
     return;
   }
@@ -446,7 +477,10 @@ function renderTasks(docs) {
       </div>
       ${t.descrizione ? `<p class="task-desc">${escapeHtml(t.descrizione)}</p>` : ''}
       <div class="task-card-bottom">
-        <span class="task-date">${failed ? '⚠️' : '📅'} ${formatDateIT(t.scadenza)}${t.ricorrente ? ' 🔁' : ''}</span>
+        <div class="task-date-col">
+          <span class="task-date">${failed ? '⚠️' : '📅'} ${formatDateIT(t.scadenza)}</span>
+          ${t.ricorrente && RICORRENZA_LABEL[t.ricorrenza] ? `<span class="recurring-label">${RICORRENZA_LABEL[t.ricorrenza]}</span>` : ''}
+        </div>
         <div class="task-pills">
           ${!failed ? `<span class="pill pill-green">💰 +${t.reward}</span>` : ''}
           <span class="pill pill-red">💀 -${t.penalita}</span>
@@ -460,7 +494,13 @@ function renderTasks(docs) {
   list.querySelectorAll('.btn-complete').forEach(btn => {
     btn.addEventListener('click', () => {
       const doc = allTaskDocs.find(d => d.id === btn.dataset.id);
-      if (doc) completeTask(btn.dataset.id, doc.data(), btn);
+      if (!doc) return;
+      const t = doc.data();
+      if (t.stato === 'fallita') {
+        completeTask(btn.dataset.id, t, btn);
+      } else {
+        showNoteModal(btn.dataset.id, t, btn);
+      }
     });
   });
 
@@ -512,7 +552,7 @@ function showUndoToast(onUndo, onCommit) {
   toast.classList.remove('hidden');
 
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    bar.style.transition = 'width 10s linear';
+    bar.style.transition = 'width 5s linear';
     bar.style.width = '0%';
   }));
 
@@ -520,7 +560,7 @@ function showUndoToast(onUndo, onCommit) {
   undoTimeout = setTimeout(async () => {
     toast.classList.add('hidden');
     await onCommit();
-  }, 10000);
+  }, 5000);
 
   const fresh = undoBtn.cloneNode(true);
   undoBtn.parentNode.replaceChild(fresh, undoBtn);
@@ -537,7 +577,7 @@ function dismissToast() {
 }
 
 /* ===== COMPLETE TASK ===== */
-async function completeTask(docId, taskData, anchorEl) {
+async function completeTask(docId, taskData, anchorEl, nota = null) {
   if (pendingComplete) {
     dismissToast();
     await commitPendingComplete();
@@ -553,7 +593,7 @@ async function completeTask(docId, taskData, anchorEl) {
   if (navigator.vibrate) navigator.vibrate(100);
   await updateCoins(coinDelta);
 
-  pendingComplete = { docId, taskData, coinDelta };
+  pendingComplete = { docId, taskData, coinDelta, nota };
   applyFilter();
 
   showUndoToast(
@@ -568,14 +608,16 @@ async function completeTask(docId, taskData, anchorEl) {
 
 async function commitPendingComplete() {
   if (!pendingComplete) return;
-  const { docId, taskData, coinDelta } = pendingComplete;
+  const { docId, taskData, coinDelta, nota } = pendingComplete;
   pendingComplete = null;
   try {
-    await db.collection('tasks').doc(docId).update({
+    const taskUpdate = {
       stato:           'completata',
       coinAccreditati: coinDelta > 0,
       completedAt:     firebase.firestore.FieldValue.serverTimestamp()
-    });
+    };
+    if (nota) taskUpdate.nota = nota;
+    await db.collection('tasks').doc(docId).update(taskUpdate);
     if (coinDelta > 0) {
       await db.collection('settings').doc('user').set(
         { consecutiveCompleted: firebase.firestore.FieldValue.increment(1) },
@@ -839,6 +881,7 @@ function renderStorico() {
         <span class="task-name">${escapeHtml(t.nome)}</span>
         <span class="priority-dot priority-${t.priorita}"></span>
       </div>
+      ${t.nota ? `<p class="history-note">${escapeHtml(t.nota)}</p>` : ''}
       <div class="history-card-bottom">
         <span class="task-date">📅 ${formatDateIT(dateRef)}</span>
         <span class="pill ${completed ? 'pill-green' : 'pill-red'}">
@@ -1190,6 +1233,14 @@ function showBadgeModal(badge) {
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); }, { once: true });
 }
 
+/* ===== RECURRING LABEL MAP ===== */
+const RICORRENZA_LABEL = {
+  giornaliera:   '🔁 si ripete ogni giorno',
+  settimanale:   '🔁 si ripete ogni settimana',
+  bisettimanale: '🔁 si ripete ogni 2 settimane',
+  mensile:       '🔁 si ripete ogni mese'
+};
+
 /* ===== RECURRING HELPER ===== */
 function computeNextScadenza(date, ricorrenza) {
   const next = new Date(date);
@@ -1333,6 +1384,164 @@ function maybeShowMorningReminder() {
     setTimeout(showMorningReminder, 1000);
   }
 }
+
+/* ===== SEARCH BAR ===== */
+document.getElementById('search-bar').addEventListener('input', e => {
+  currentSearch = e.target.value.trim().toLowerCase();
+  applyFilter();
+});
+
+/* ===== NOTE MODAL ===== */
+function showNoteModal(docId, taskData, anchorEl) {
+  document.getElementById('f-nota').value = '';
+  const overlay = document.getElementById('note-modal-overlay');
+  const panel   = document.getElementById('note-modal-panel');
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => panel.classList.add('open'));
+  document.body.style.overflow = 'hidden';
+
+  const proceed = nota => {
+    panel.classList.remove('open');
+    setTimeout(() => {
+      overlay.classList.add('hidden');
+      document.body.style.overflow = '';
+      completeTask(docId, taskData, anchorEl, nota);
+    }, 250);
+  };
+
+  document.getElementById('btn-nota-skip').onclick = () => proceed(null);
+  document.getElementById('btn-nota-save').onclick = () => {
+    const nota = document.getElementById('f-nota').value.trim();
+    proceed(nota || null);
+  };
+}
+
+/* ===== BACKUP EXPORT ===== */
+function serializeForExport(val) {
+  if (val === null || val === undefined) return val;
+  if (val && typeof val.toDate === 'function') return { _ts: val.toDate().toISOString() };
+  if (Array.isArray(val)) return val.map(serializeForExport);
+  if (typeof val === 'object') {
+    const out = {};
+    for (const k of Object.keys(val)) out[k] = serializeForExport(val[k]);
+    return out;
+  }
+  return val;
+}
+
+function deserializeFromImport(val) {
+  if (val === null || val === undefined) return val;
+  if (val && typeof val === 'object' && val._ts) return firebase.firestore.Timestamp.fromDate(new Date(val._ts));
+  if (Array.isArray(val)) return val.map(deserializeFromImport);
+  if (typeof val === 'object') {
+    const out = {};
+    for (const k of Object.keys(val)) { if (k !== '_id') out[k] = deserializeFromImport(val[k]); }
+    return out;
+  }
+  return val;
+}
+
+document.getElementById('btn-export').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-export');
+  btn.disabled = true; btn.textContent = '⏳ Esportazione…';
+  try {
+    const [tasksSnap, settingsSnap] = await Promise.all([
+      db.collection('tasks').get(),
+      db.collection('settings').doc('user').get()
+    ]);
+    const data = {
+      version:    '1.0',
+      exportDate: new Date().toISOString(),
+      tasks:      tasksSnap.docs.map(d => ({ _id: d.id, ...serializeForExport(d.data()) })),
+      settings:   settingsSnap.exists ? serializeForExport(settingsSnap.data()) : {}
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `questlist-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showInfoToast('Backup esportato ✓');
+  } catch (e) {
+    console.error('Export error:', e);
+    showInfoToast('Errore esportazione');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬇️ Esporta JSON';
+  }
+});
+
+/* ===== BACKUP IMPORT ===== */
+let importData = null;
+
+document.getElementById('btn-import-json').addEventListener('click', () => {
+  document.getElementById('import-file-input').click();
+});
+
+document.getElementById('import-file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.version || !Array.isArray(data.tasks)) { showInfoToast('File non valido'); return; }
+      importData = data;
+      const overlay = document.getElementById('import-modal-overlay');
+      overlay.classList.remove('hidden');
+      requestAnimationFrame(() => document.getElementById('import-modal-panel').classList.add('open'));
+      document.body.style.overflow = 'hidden';
+    } catch { showInfoToast('File non valido'); }
+  };
+  reader.readAsText(file);
+});
+
+const closeImportModal = () => {
+  document.getElementById('import-modal-panel').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('import-modal-overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+    importData = null;
+  }, 300);
+};
+
+document.getElementById('btn-import-cancel').addEventListener('click', closeImportModal);
+document.getElementById('import-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('import-modal-overlay')) closeImportModal();
+});
+
+document.getElementById('btn-import-confirm').addEventListener('click', async () => {
+  if (!importData) return;
+  const btn = document.getElementById('btn-import-confirm');
+  btn.disabled = true; btn.textContent = '⏳ Importazione…';
+  try {
+    const existing = await db.collection('tasks').get();
+    const delBatch = db.batch();
+    existing.docs.forEach(d => delBatch.delete(d.ref));
+    await delBatch.commit();
+
+    if (importData.settings) {
+      await db.collection('settings').doc('user').set(deserializeFromImport(importData.settings));
+    }
+
+    const tasks = importData.tasks || [];
+    for (let i = 0; i < tasks.length; i += 400) {
+      const batch = db.batch();
+      tasks.slice(i, i + 400).forEach(task => {
+        const { _id, ...rest } = task;
+        const ref = _id ? db.collection('tasks').doc(_id) : db.collection('tasks').doc();
+        batch.set(ref, deserializeFromImport(rest));
+      });
+      await batch.commit();
+    }
+    window.location.reload();
+  } catch (e) {
+    console.error('Import error:', e);
+    showInfoToast('Errore importazione');
+    btn.disabled = false; btn.textContent = 'Importa';
+  }
+});
 
 function showMorningReminder() {
   const today    = new Date(); today.setHours(0, 0, 0, 0);

@@ -1,4 +1,4 @@
-const CACHE = 'questlist-v7';
+const CACHE = 'questlist-v8';
 const ASSETS = [
   '/todo-gamification/',
   '/todo-gamification/index.html',

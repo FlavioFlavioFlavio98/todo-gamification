@@ -43,6 +43,10 @@
         <button class="filter-chip" data-filter="oggi">Oggi</button>
         <button class="filter-chip" data-filter="domani">Domani</button>
       </div>
+      <div class="search-bar-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="search-bar" type="search" class="search-input" placeholder="Cerca task..." autocomplete="off" />
+      </div>
       <div id="task-list" class="task-list"></div>
       <div id="empty-state" class="empty-state hidden">
         <div id="empty-icon" class="empty-icon">⚔️</div>
@@ -200,6 +204,16 @@
         </button>
       </div>
 
+      <!-- Backup card -->
+      <div class="card backup-card">
+        <h3 class="card-title">💾 Backup dati</h3>
+        <div class="backup-buttons">
+          <button id="btn-export" class="btn btn-ghost backup-btn">⬇️ Esporta JSON</button>
+          <button id="btn-import-json" class="btn btn-ghost backup-btn">⬆️ Importa JSON</button>
+        </div>
+        <input type="file" id="import-file-input" accept=".json" style="display:none" />
+      </div>
+
       <!-- Firebase test card -->
       <div class="card firebase-test-card">
         <h3 class="card-title">🔌 Test connessione Firebase</h3>
@@ -212,7 +226,7 @@
   </main>
 
   <!-- ===== VERSION BADGE ===== -->
-  <div class="version-badge">V7</div>
+  <div class="version-badge">V8</div>
 
   <!-- ===== FAB ===== -->
   <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
@@ -359,6 +373,36 @@
     </div>
   </div>
 
+  <!-- ===== NOTE MODAL ===== -->
+  <div id="note-modal-overlay" class="modal-overlay hidden">
+    <div id="note-modal-panel" class="modal-panel modal-panel-sm">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">📝 Vuoi aggiungere una nota?</h2>
+      <div class="modal-body">
+        <textarea id="f-nota" class="form-textarea" placeholder="Es. ci ho messo più del previsto…" rows="3" maxlength="300"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-nota-skip" class="btn btn-ghost">Salta</button>
+        <button id="btn-nota-save" class="btn btn-primary">Salva nota</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== IMPORT CONFIRM MODAL ===== -->
+  <div id="import-modal-overlay" class="modal-overlay hidden">
+    <div id="import-modal-panel" class="modal-panel modal-panel-sm">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">⚠️ Importa backup</h2>
+      <div class="modal-body">
+        <p class="modal-text">Importare questo backup <strong>sovrascriverà tutti i dati attuali</strong>. Sei sicuro?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-import-cancel" class="btn btn-ghost">Annulla</button>
+        <button id="btn-import-confirm" class="btn btn-primary">Importa</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== DELETE TASK MODAL ===== -->
   <div id="delete-task-modal-overlay" class="modal-overlay hidden">
     <div id="delete-task-modal-panel" class="modal-panel modal-panel-sm">
@@ -433,6 +477,17 @@
       <div class="modal-handle"></div>
       <h2 class="modal-title">📋 Novità e versioni</h2>
       <div class="modal-body changelog-body">
+        <div class="changelog-block">
+          <p class="changelog-version">V8 — Blocco 7B</p>
+          <ul class="changelog-items">
+            <li>Nota opzionale al completamento task</li>
+            <li>Ricerca task in homepage</li>
+            <li>Widget coin riprogettato e più prominente</li>
+            <li>Backup e importazione dati JSON</li>
+            <li>Timer annullamento ridotto a 5 secondi</li>
+            <li>Etichetta ricorrenza visibile sulle card</li>
+          </ul>
+        </div>
         <div class="changelog-block">
           <p class="changelog-version">V7 — Blocco 7</p>
           <ul class="changelog-items">
