@@ -80,6 +80,8 @@ btnTest.addEventListener('click', runFirebaseTest);
 /* ===== FORM STATE ===== */
 let calYear, calMonth, calSelected = null;
 let formReward = null, formPenalty = null, formPriority = null;
+let formRicorrente = false, formRicorrenza = null;
+let editDocId = null;
 
 /* ===== MODAL ===== */
 const fabAdd       = document.getElementById('fab-add');
@@ -110,6 +112,9 @@ function resetForm() {
   formReward = null;
   formPenalty = null;
   formPriority = null;
+  formRicorrente = false;
+  formRicorrenza = null;
+  editDocId = null;
 
   const dateDisplay = document.getElementById('f-date-display');
   dateDisplay.textContent = '📅 Seleziona una data';
@@ -118,6 +123,18 @@ function resetForm() {
   document.getElementById('cal-widget').classList.add('hidden');
   document.querySelectorAll('.coin-sq').forEach(sq => sq.classList.remove('selected-green', 'selected-red'));
   document.querySelectorAll('.priority-btn').forEach(btn => btn.classList.remove('selected'));
+
+  const toggle = document.getElementById('f-ricorrente-toggle');
+  if (toggle) {
+    toggle.classList.remove('active');
+    toggle.setAttribute('aria-checked', 'false');
+  }
+  const opts = document.getElementById('f-ricorrenza-options');
+  if (opts) opts.classList.add('hidden');
+  document.querySelectorAll('.ricorrenza-btn').forEach(b => b.classList.remove('selected'));
+
+  document.getElementById('btn-create').textContent = 'Crea Task';
+  document.querySelector('.modal-title').textContent = 'Nuova Quest';
 
   const today = new Date();
   calYear  = today.getFullYear();
@@ -233,33 +250,45 @@ btnCreate.addEventListener('click', async () => {
   const nome = document.getElementById('f-nome').value.trim();
   const desc = document.getElementById('f-desc').value.trim();
 
-  if (!nome)         { showFormError('Inserisci il nome della task.'); return; }
-  if (!calSelected)  { showFormError('Seleziona una data di scadenza.'); return; }
-  if (!formReward)   { showFormError('Seleziona le coin di reward.'); return; }
-  if (!formPenalty)  { showFormError('Seleziona le coin di penalità.'); return; }
-  if (!formPriority) { showFormError('Seleziona la priorità.'); return; }
+  if (!nome)                              { showFormError('Inserisci il nome della task.'); return; }
+  if (!calSelected)                       { showFormError('Seleziona una data di scadenza.'); return; }
+  if (!formReward)                        { showFormError('Seleziona le coin di reward.'); return; }
+  if (!formPenalty)                       { showFormError('Seleziona le coin di penalità.'); return; }
+  if (!formPriority)                      { showFormError('Seleziona la priorità.'); return; }
+  if (formRicorrente && !formRicorrenza)  { showFormError('Seleziona la frequenza di ricorrenza.'); return; }
 
+  const isEdit = !!editDocId;
   btnCreate.disabled    = true;
   btnCreate.textContent = '⏳ Salvataggio…';
 
+  const payload = {
+    nome,
+    descrizione:  desc,
+    scadenza:     firebase.firestore.Timestamp.fromDate(calSelected),
+    reward:       formReward,
+    penalita:     formPenalty,
+    priorita:     formPriority,
+    ricorrente:   formRicorrente,
+    ricorrenza:   formRicorrente ? formRicorrenza : null,
+  };
+
   try {
-    await db.collection('tasks').add({
-      nome,
-      descrizione:     desc,
-      scadenza:        firebase.firestore.Timestamp.fromDate(calSelected),
-      reward:          formReward,
-      penalita:        formPenalty,
-      priorita:        formPriority,
-      stato:           'attiva',
-      coinAccreditati: false,
-      createdAt:       firebase.firestore.FieldValue.serverTimestamp()
-    });
+    if (isEdit) {
+      await db.collection('tasks').doc(editDocId).update(payload);
+    } else {
+      await db.collection('tasks').add({
+        ...payload,
+        stato:           'attiva',
+        coinAccreditati: false,
+        createdAt:       firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
     closeModal();
   } catch (err) {
     showFormError('Errore Firestore: ' + err.message);
   } finally {
     btnCreate.disabled    = false;
-    btnCreate.textContent = 'Crea Task';
+    btnCreate.textContent = isEdit ? 'Salva modifiche' : 'Crea Task';
   }
 });
 
@@ -403,11 +432,21 @@ function renderTasks(docs) {
     card.innerHTML  = `
       <div class="task-card-top">
         <span class="task-name">${escapeHtml(t.nome)}</span>
-        <span class="priority-dot priority-${t.priorita}"></span>
+        <div class="task-card-top-right">
+          <span class="priority-dot priority-${t.priorita}"></span>
+          ${!failed ? `
+          <div class="task-menu-wrap">
+            <button class="btn-task-menu" aria-label="Opzioni">⋮</button>
+            <div class="task-menu-dropdown hidden">
+              <button class="task-menu-item" data-action="edit" data-id="${doc.id}">✏️ Modifica</button>
+              <button class="task-menu-item" data-action="delete" data-id="${doc.id}">🗑️ Elimina</button>
+            </div>
+          </div>` : ''}
+        </div>
       </div>
       ${t.descrizione ? `<p class="task-desc">${escapeHtml(t.descrizione)}</p>` : ''}
       <div class="task-card-bottom">
-        <span class="task-date">${failed ? '⚠️' : '📅'} ${formatDateIT(t.scadenza)}</span>
+        <span class="task-date">${failed ? '⚠️' : '📅'} ${formatDateIT(t.scadenza)}${t.ricorrente ? ' 🔁' : ''}</span>
         <div class="task-pills">
           ${!failed ? `<span class="pill pill-green">💰 +${t.reward}</span>` : ''}
           <span class="pill pill-red">💀 -${t.penalita}</span>
@@ -422,6 +461,28 @@ function renderTasks(docs) {
     btn.addEventListener('click', () => {
       const doc = allTaskDocs.find(d => d.id === btn.dataset.id);
       if (doc) completeTask(btn.dataset.id, doc.data(), btn);
+    });
+  });
+
+  list.querySelectorAll('.btn-task-menu').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const dropdown = btn.nextElementSibling;
+      const isHidden = dropdown.classList.contains('hidden');
+      document.querySelectorAll('.task-menu-dropdown').forEach(d => d.classList.add('hidden'));
+      if (isHidden) dropdown.classList.remove('hidden');
+    });
+  });
+
+  list.querySelectorAll('.task-menu-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      document.querySelectorAll('.task-menu-dropdown').forEach(d => d.classList.add('hidden'));
+      const docId   = item.dataset.id;
+      const taskDoc = allTaskDocs.find(d => d.id === docId);
+      if (!taskDoc) return;
+      if (item.dataset.action === 'edit')   openEditModal(docId, taskDoc.data());
+      if (item.dataset.action === 'delete') showDeleteTaskModal(docId);
     });
   });
 }
@@ -507,7 +568,7 @@ async function completeTask(docId, taskData, anchorEl) {
 
 async function commitPendingComplete() {
   if (!pendingComplete) return;
-  const { docId, coinDelta } = pendingComplete;
+  const { docId, taskData, coinDelta } = pendingComplete;
   pendingComplete = null;
   try {
     await db.collection('tasks').doc(docId).update({
@@ -520,6 +581,17 @@ async function commitPendingComplete() {
         { consecutiveCompleted: firebase.firestore.FieldValue.increment(1) },
         { merge: true }
       );
+    }
+    if (taskData && taskData.ricorrente && taskData.ricorrenza) {
+      const nextDate = computeNextScadenza(taskData.scadenza.toDate(), taskData.ricorrenza);
+      await db.collection('tasks').add({
+        nome: taskData.nome, descrizione: taskData.descrizione,
+        reward: taskData.reward, penalita: taskData.penalita, priorita: taskData.priorita,
+        ricorrente: true, ricorrenza: taskData.ricorrenza,
+        scadenza: firebase.firestore.Timestamp.fromDate(nextDate),
+        stato: 'attiva', coinAccreditati: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
     }
   } catch (e) {
     console.error('commitPendingComplete error:', e);
@@ -590,6 +662,21 @@ async function checkExpiredTasks() {
     await batch.commit();
     await db.collection('settings').doc('user').set({ consecutiveCompleted: 0 }, { merge: true });
     if (penalty > 0) await updateCoins(-penalty);
+    const recurringExpired = expired.filter(d => d.data().ricorrente && d.data().ricorrenza);
+    if (recurringExpired.length > 0) {
+      await Promise.all(recurringExpired.map(doc => {
+        const t = doc.data();
+        const nextDate = computeNextScadenza(t.scadenza.toDate(), t.ricorrenza);
+        return db.collection('tasks').add({
+          nome: t.nome, descrizione: t.descrizione,
+          reward: t.reward, penalita: t.penalita, priorita: t.priorita,
+          ricorrente: true, ricorrenza: t.ricorrenza,
+          scadenza: firebase.firestore.Timestamp.fromDate(nextDate),
+          stato: 'attiva', coinAccreditati: false,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }));
+    }
   } finally {
     expiryInProgress = false;
   }
@@ -604,8 +691,10 @@ db.collection('tasks')
   .where('stato', 'in', ['attiva', 'fallita'])
   .onSnapshot(snapshot => {
     allTaskDocs = snapshot.docs;
+    tasksLoaded = true;
     checkExpiredTasks();
     applyFilter();
+    maybeShowMorningReminder();
   }, err => {
     console.error('Firestore listener error:', err);
   });
@@ -849,6 +938,9 @@ async function recordOpening() {
       return;
     }
 
+    // New day — flag morning reminder
+    morningReminderPending = true;
+
     const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
@@ -866,6 +958,7 @@ async function recordOpening() {
       streak: newStreak, maxStreak: newMaxStreak,
       lastOpenDate: todayStr, activeDays
     }, { merge: true });
+    maybeShowMorningReminder();
   } catch (e) {
     console.error('recordOpening error:', e);
   }
@@ -1095,4 +1188,204 @@ function showBadgeModal(badge) {
   };
   document.getElementById('btn-badge-modal-close').onclick = close;
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); }, { once: true });
+}
+
+/* ===== RECURRING HELPER ===== */
+function computeNextScadenza(date, ricorrenza) {
+  const next = new Date(date);
+  switch (ricorrenza) {
+    case 'giornaliera':   next.setDate(next.getDate() + 1);   break;
+    case 'settimanale':   next.setDate(next.getDate() + 7);   break;
+    case 'bisettimanale': next.setDate(next.getDate() + 14);  break;
+    case 'mensile':       next.setMonth(next.getMonth() + 1); break;
+  }
+  return next;
+}
+
+/* ===== EDIT TASK MODAL ===== */
+function openEditModal(docId, taskData) {
+  resetForm();
+  editDocId = docId;
+
+  document.getElementById('f-nome').value = taskData.nome || '';
+  document.getElementById('f-desc').value = taskData.descrizione || '';
+
+  const scadDate  = taskData.scadenza.toDate();
+  calYear         = scadDate.getFullYear();
+  calMonth        = scadDate.getMonth();
+  calSelected     = new Date(scadDate); calSelected.setHours(0, 0, 0, 0);
+  renderCalendar();
+  const dd = document.getElementById('f-date-display');
+  dd.textContent = `📅 ${calSelected.getDate()} ${MESI_SHORT[calSelected.getMonth()]} ${calSelected.getFullYear()}`;
+  dd.classList.add('selected');
+
+  formReward = taskData.reward;
+  document.getElementById('sel-reward').querySelectorAll('.coin-sq').forEach(sq => {
+    if (parseInt(sq.dataset.val) === formReward) sq.classList.add('selected-green');
+  });
+
+  formPenalty = taskData.penalita;
+  document.getElementById('sel-penalty').querySelectorAll('.coin-sq').forEach(sq => {
+    if (parseInt(sq.dataset.val) === formPenalty) sq.classList.add('selected-red');
+  });
+
+  formPriority = taskData.priorita;
+  document.querySelectorAll('.priority-btn').forEach(btn => {
+    if (btn.dataset.val === formPriority) btn.classList.add('selected');
+  });
+
+  if (taskData.ricorrente) {
+    formRicorrente = true;
+    formRicorrenza = taskData.ricorrenza || null;
+    const toggle = document.getElementById('f-ricorrente-toggle');
+    toggle.classList.add('active');
+    toggle.setAttribute('aria-checked', 'true');
+    document.getElementById('f-ricorrenza-options').classList.remove('hidden');
+    if (formRicorrenza) {
+      document.querySelectorAll('.ricorrenza-btn').forEach(btn => {
+        if (btn.dataset.val === formRicorrenza) btn.classList.add('selected');
+      });
+    }
+  }
+
+  document.getElementById('btn-create').textContent = 'Salva modifiche';
+  document.querySelector('.modal-title').textContent = 'Modifica Quest';
+
+  modalOverlay.classList.remove('hidden');
+  requestAnimationFrame(() => modalPanel.classList.add('open'));
+  document.body.style.overflow = 'hidden';
+}
+
+/* ===== DELETE TASK MODAL ===== */
+let deleteDocId = null;
+
+function showDeleteTaskModal(docId) {
+  deleteDocId = docId;
+  const overlay = document.getElementById('delete-task-modal-overlay');
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => document.getElementById('delete-task-modal-panel').classList.add('open'));
+  document.body.style.overflow = 'hidden';
+}
+
+const closeDeleteTaskModal = () => {
+  document.getElementById('delete-task-modal-panel').classList.remove('open');
+  setTimeout(() => {
+    document.getElementById('delete-task-modal-overlay').classList.add('hidden');
+    document.body.style.overflow = '';
+    deleteDocId = null;
+  }, 300);
+};
+
+document.getElementById('btn-delete-task-cancel').addEventListener('click', closeDeleteTaskModal);
+document.getElementById('delete-task-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('delete-task-modal-overlay')) closeDeleteTaskModal();
+});
+document.getElementById('btn-delete-task-confirm').addEventListener('click', async () => {
+  if (!deleteDocId) return;
+  const btn = document.getElementById('btn-delete-task-confirm');
+  btn.disabled = true;
+  try {
+    await db.collection('tasks').doc(deleteDocId).delete();
+    closeDeleteTaskModal();
+    showInfoToast('Task eliminata');
+  } catch (e) {
+    console.error('Delete task error:', e);
+    btn.disabled = false;
+  }
+});
+
+/* ===== CLOSE CONTEXT MENU ON OUTSIDE CLICK ===== */
+document.addEventListener('click', () => {
+  document.querySelectorAll('.task-menu-dropdown').forEach(d => d.classList.add('hidden'));
+});
+
+/* ===== RECURRING TOGGLE LISTENERS ===== */
+document.getElementById('f-ricorrente-toggle').addEventListener('click', () => {
+  formRicorrente = !formRicorrente;
+  const toggle = document.getElementById('f-ricorrente-toggle');
+  toggle.classList.toggle('active', formRicorrente);
+  toggle.setAttribute('aria-checked', String(formRicorrente));
+  const opts = document.getElementById('f-ricorrenza-options');
+  opts.classList.toggle('hidden', !formRicorrente);
+  if (!formRicorrente) {
+    formRicorrenza = null;
+    document.querySelectorAll('.ricorrenza-btn').forEach(b => b.classList.remove('selected'));
+  }
+});
+
+document.querySelectorAll('.ricorrenza-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ricorrenza-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    formRicorrenza = btn.dataset.val;
+  });
+});
+
+/* ===== MORNING REMINDER ===== */
+let tasksLoaded            = false;
+let morningReminderPending = false;
+let morningReminderShown   = false;
+
+function maybeShowMorningReminder() {
+  if (morningReminderPending && !morningReminderShown && tasksLoaded) {
+    morningReminderPending = false;
+    morningReminderShown   = true;
+    setTimeout(showMorningReminder, 1000);
+  }
+}
+
+function showMorningReminder() {
+  const today    = new Date(); today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+
+  const todayTasks  = allTaskDocs.filter(d => {
+    const t = d.data();
+    if (t.stato !== 'attiva') return false;
+    const s = t.scadenza.toDate(); s.setHours(0, 0, 0, 0);
+    return s.getTime() === today.getTime();
+  });
+  const failedTasks = allTaskDocs.filter(d => d.data().stato === 'fallita');
+
+  const overlay = document.getElementById('morning-modal-overlay');
+  const panel   = document.getElementById('morning-modal-panel');
+
+  const todayEl = document.getElementById('morning-today-list');
+  if (todayTasks.length === 0) {
+    todayEl.innerHTML = '<p class="morning-empty">Nessuna task in scadenza oggi 🎉</p>';
+  } else {
+    todayEl.innerHTML = todayTasks.map(doc => {
+      const t = doc.data();
+      return `<div class="morning-task-row">
+        <span class="morning-task-name">${escapeHtml(t.nome)}</span>
+        <span class="priority-dot priority-${t.priorita}"></span>
+        <span class="pill pill-green">💰 ${t.reward}</span>
+      </div>`;
+    }).join('');
+  }
+
+  const failedSection = document.getElementById('morning-failed-section');
+  if (failedTasks.length > 0) {
+    failedSection.classList.remove('hidden');
+    document.getElementById('morning-failed-list').innerHTML = failedTasks.map(doc => {
+      const t = doc.data();
+      return `<div class="morning-task-row">
+        <span class="morning-task-name">${escapeHtml(t.nome)}</span>
+        <span class="pill pill-red">💀 -${t.penalita}</span>
+      </div>`;
+    }).join('');
+  } else {
+    failedSection.classList.add('hidden');
+  }
+
+  overlay.classList.remove('hidden');
+  requestAnimationFrame(() => panel.classList.add('open'));
+  document.body.style.overflow = 'hidden';
+
+  document.getElementById('btn-morning-close').onclick = () => {
+    panel.classList.remove('open');
+    setTimeout(() => { overlay.classList.add('hidden'); document.body.style.overflow = ''; }, 300);
+  };
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) document.getElementById('btn-morning-close').click();
+  }, { once: true });
 }
