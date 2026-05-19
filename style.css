@@ -1873,3 +1873,113 @@ body {
   transition: opacity var(--transition);
 }
 .theme-card-item.active .theme-check { opacity: 1; }
+
+/* ===== V11: OFFLINE BANNER ===== */
+.offline-banner {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  background: #f59e0b;
+  color: #0f172a;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  z-index: 99;
+  opacity: 0;
+  transform: translateY(-100%);
+  transition: opacity 300ms ease, transform 300ms ease;
+  pointer-events: none;
+}
+.offline-banner.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.offline-banner.hidden { display: none; }
+
+/* ===== V11: SKELETON LOADING ===== */
+@keyframes skeletonShimmer {
+  0%   { background-position:  200% center; }
+  100% { background-position: -200% center; }
+}
+
+.skeleton-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.skeleton-line {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--border)  50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s linear infinite;
+  border-radius: 4px;
+  height: 16px;
+  margin-bottom: 8px;
+}
+
+.skeleton-title    { width: 60%; height: 20px; }
+.skeleton-subtitle { width: 40%; }
+
+.skeleton-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.skeleton-pill {
+  width: 60px;
+  height: 24px;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--border)  50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s linear infinite;
+}
+
+/* Stats section skeleton */
+.stats-loading .stat-card-value,
+.stats-loading .week-stat-val,
+.stats-loading .level-num,
+.stats-loading .level-name,
+.stats-loading .level-xp {
+  color: transparent !important;
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--border)  50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s linear infinite;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 36px;
+}
+
+.stats-loading #coin-chart,
+.stats-loading #heatmap-grid,
+.stats-loading #badges-grid {
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 25%,
+    var(--border)  50%,
+    var(--bg-card) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s linear infinite;
+  border-radius: var(--radius-sm);
+  min-height: 60px;
+}

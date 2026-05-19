@@ -790,6 +790,48 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) checkExpiredTasks();
 });
 
+/* ===== SKELETON LOADING ===== */
+(function initSkeletons() {
+  function skeletonCard() {
+    return `<div class="skeleton-card">
+      <div class="skeleton-line skeleton-title"></div>
+      <div class="skeleton-line skeleton-subtitle"></div>
+      <div class="skeleton-row">
+        <div class="skeleton-pill"></div>
+        <div class="skeleton-pill"></div>
+      </div>
+    </div>`;
+  }
+  const taskList = document.getElementById('task-list');
+  if (taskList) taskList.innerHTML = [1,2,3].map(skeletonCard).join('');
+  const storicoList = document.getElementById('storico-list');
+  if (storicoList) storicoList.innerHTML = [1,2].map(skeletonCard).join('');
+  const statsSection = document.getElementById('section-statistiche');
+  if (statsSection) statsSection.classList.add('stats-loading');
+})();
+
+/* ===== OFFLINE BANNER ===== */
+(function initOfflineBanner() {
+  const banner = document.getElementById('offline-banner');
+  if (!banner) return;
+
+  if (!navigator.onLine) {
+    banner.classList.remove('hidden');
+    requestAnimationFrame(() => banner.classList.add('visible'));
+  }
+
+  window.addEventListener('offline', () => {
+    banner.classList.remove('hidden');
+    requestAnimationFrame(() => banner.classList.add('visible'));
+  });
+
+  window.addEventListener('online', () => {
+    banner.classList.remove('visible');
+    setTimeout(() => banner.classList.add('hidden'), 320);
+    showInfoToast('✅ Connessione ripristinata');
+  });
+})();
+
 /* ===== FIRESTORE LISTENER ===== */
 db.collection('tasks')
   .where('stato', 'in', ['attiva', 'fallita'])
@@ -1107,6 +1149,8 @@ let prevLevelNum = null;
 
 function renderStats() {
   if (!document.getElementById('stat-level-num')) return;
+  // Remove stats skeleton on first data load
+  document.getElementById('section-statistiche').classList.remove('stats-loading');
 
   const s             = userSettings;
   const completedDocs = storicoDocs.filter(d => d.data().stato === 'completata');

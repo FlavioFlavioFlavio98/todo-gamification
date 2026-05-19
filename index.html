@@ -37,6 +37,11 @@
 </head>
 <body>
 
+  <!-- ===== OFFLINE BANNER ===== -->
+  <div id="offline-banner" class="offline-banner hidden">
+    📡 Sei offline — le modifiche saranno sincronizzate quando torni online
+  </div>
+
   <!-- ===== HEADER ===== -->
   <header class="app-header">
     <div class="header-inner">
@@ -272,7 +277,7 @@
   </main>
 
   <!-- ===== VERSION BADGE ===== -->
-  <div class="version-badge">V10</div>
+  <div class="version-badge">V11</div>
 
   <!-- ===== FAB ===== -->
   <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
@@ -508,6 +513,14 @@
       <div class="modal-handle"></div>
       <h2 class="modal-title">📋 Novità e versioni</h2>
       <div class="modal-body changelog-body">
+        <div class="changelog-block">
+          <p class="changelog-version">V11 — Blocco 9B</p>
+          <ul class="changelog-items">
+            <li>Skeleton loading al caricamento dati</li>
+            <li>Gestione offline con banner e cache intelligente</li>
+            <li>Service worker aggiornato per uso offline</li>
+          </ul>
+        </div>
         <div class="changelog-block">
           <p class="changelog-version">V10 — Blocco 9A</p>
           <ul class="changelog-items">
