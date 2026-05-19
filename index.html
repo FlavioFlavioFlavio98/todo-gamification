@@ -42,9 +42,12 @@
     <div class="header-inner">
       <span class="app-logo">⚔️</span>
       <h1 class="app-title">QuestList</h1>
-      <div class="coin-display">
-        <span class="coin-icon">🪙</span>
-        <span id="coin-count">—</span>
+      <div class="header-right">
+        <span id="header-level" class="header-level">⚔️ Novizio</span>
+        <div class="coin-display">
+          <span class="coin-icon">🪙</span>
+          <span id="coin-count">—</span>
+        </div>
       </div>
     </div>
   </header>
@@ -269,7 +272,7 @@
   </main>
 
   <!-- ===== VERSION BADGE ===== -->
-  <div class="version-badge">V9</div>
+  <div class="version-badge">V10</div>
 
   <!-- ===== FAB ===== -->
   <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
@@ -506,6 +509,22 @@
       <h2 class="modal-title">📋 Novità e versioni</h2>
       <div class="modal-body changelog-body">
         <div class="changelog-block">
+          <p class="changelog-version">V10 — Blocco 9A</p>
+          <ul class="changelog-items">
+            <li>Header con gradient e livello visibile</li>
+            <li>Animazione contatore coin</li>
+            <li>Transizioni fluide tra sezioni</li>
+            <li>Micro-animazioni su tutti i bottoni</li>
+            <li>Barra urgenza colorata sulle card</li>
+            <li>Bordo pulsante per task in scadenza oggi</li>
+            <li>Confetti per reward alta (4-5 coin)</li>
+            <li>Animazione celebrativa level up</li>
+            <li>Shimmer sui badge bloccati</li>
+            <li>Barra livello animata</li>
+            <li>Contatori animati nelle statistiche</li>
+          </ul>
+        </div>
+        <div class="changelog-block">
           <p class="changelog-version">V9 — Blocco 8</p>
           <ul class="changelog-items">
             <li>Sistema temi: Dark, Light, Ocean, Forest</li>
@@ -590,6 +609,15 @@
       <div class="modal-footer">
         <button id="btn-changelog-close" class="btn btn-ghost" style="flex:1">Chiudi</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== LEVEL UP MODAL ===== -->
+  <div id="levelup-overlay" class="levelup-overlay hidden">
+    <div class="levelup-panel">
+      <div id="levelup-icon-el" class="levelup-icon">⚔️</div>
+      <div id="levelup-name-el" class="levelup-title">Livello 2</div>
+      <div id="levelup-sub-el" class="levelup-sub">Livello superiore! 🎉</div>
     </div>
   </div>
 

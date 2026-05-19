@@ -1,16 +1,35 @@
 /* ===== NAVIGATION ===== */
 const navItems = document.querySelectorAll('.nav-item');
 const sections = document.querySelectorAll('.section');
+let navTransitioning = false;
 
 function navigateTo(sectionName) {
-  sections.forEach(s => s.classList.remove('active'));
+  if (navTransitioning) return;
+  const current = document.querySelector('.section.active');
+  const target  = document.getElementById('section-' + sectionName);
+  if (!target || target === current) return;
+
   navItems.forEach(n => n.classList.remove('active'));
-
-  const target = document.getElementById('section-' + sectionName);
-  if (target) target.classList.add('active');
-
   const navBtn = document.querySelector(`.nav-item[data-section="${sectionName}"]`);
   if (navBtn) navBtn.classList.add('active');
+
+  const doShow = () => {
+    target.classList.add('active');
+    if (sectionName === 'statistiche') setTimeout(triggerStatAnimations, 80);
+  };
+
+  if (current) {
+    navTransitioning = true;
+    current.classList.remove('active');
+    current.classList.add('fading-out');
+    setTimeout(() => {
+      current.classList.remove('fading-out');
+      navTransitioning = false;
+      doShow();
+    }, 150);
+  } else {
+    doShow();
+  }
 }
 
 navItems.forEach(item => {
@@ -19,17 +38,43 @@ navItems.forEach(item => {
 
 /* ===== COIN DISPLAY ===== */
 let prevCoinBalance = null;
+let coinAnimFrame   = null;
 
 function setCoinDisplay(value) {
   const numVal = value ?? 0;
-  document.getElementById('coin-count').textContent = numVal;
+
   if (prevCoinBalance !== null && numVal !== prevCoinBalance) {
+    // Pulse animation
     const disp = document.querySelector('.coin-display');
     disp.classList.remove('coin-pulse-green', 'coin-pulse-red');
     void disp.offsetWidth;
     disp.classList.add(numVal > prevCoinBalance ? 'coin-pulse-green' : 'coin-pulse-red');
+
+    // Animated counter
+    const startVal = prevCoinBalance;
+    const endVal   = numVal;
+    const duration = 600;
+    const t0       = performance.now();
+    if (coinAnimFrame) cancelAnimationFrame(coinAnimFrame);
+    const el = document.getElementById('coin-count');
+    (function tick(now) {
+      const p     = Math.min((now - t0) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 2);
+      el.textContent = Math.round(startVal + (endVal - startVal) * eased);
+      if (p < 1) coinAnimFrame = requestAnimationFrame(tick);
+    })(t0);
+  } else {
+    document.getElementById('coin-count').textContent = numVal;
   }
+
   prevCoinBalance = numVal;
+}
+
+function updateHeaderLevel(levelName) {
+  const el = document.getElementById('header-level');
+  if (!el) return;
+  const short = levelName.length > 8 ? levelName.slice(0, 8) + '…' : levelName;
+  el.textContent = '⚔️ ' + short;
 }
 
 /* ===== FIREBASE TEST ===== */
@@ -459,8 +504,23 @@ function renderTasks(docs) {
   docs.forEach(doc => {
     const t      = doc.data();
     const failed = t.stato === 'fallita';
+
+    // Urgency bar calculation
+    const today0   = new Date(); today0.setHours(0,0,0,0);
+    const scad0    = t.scadenza.toDate(); scad0.setHours(0,0,0,0);
+    const isToday  = !failed && today0.getTime() === scad0.getTime();
+    const created0 = t.createdAt
+      ? (t.createdAt.toDate ? t.createdAt.toDate() : new Date(t.createdAt))
+      : new Date(scad0.getTime() - 7 * 864e5);
+    created0.setHours(0,0,0,0);
+    const totalMs  = scad0.getTime() - created0.getTime();
+    const elapsMs  = today0.getTime() - created0.getTime();
+    const urgPct   = failed ? 100 : (totalMs <= 0 ? 100 : Math.min(100, Math.max(0, (elapsMs / totalMs) * 100)));
+    const urgPulse = urgPct >= 90;
+    const urgColor = urgPct >= 75 ? '#ef4444' : urgPct >= 50 ? '#f59e0b' : '#22c55e';
+
     const card   = document.createElement('div');
-    card.className  = 'task-card' + (failed ? ' task-card-failed' : '');
+    card.className  = 'task-card' + (failed ? ' task-card-failed' : '') + (isToday ? ' task-urgent' : '');
     card.dataset.id = doc.id;
     card.innerHTML  = `
       <div class="task-card-top">
@@ -487,7 +547,10 @@ function renderTasks(docs) {
           ${!failed ? `<span class="pill pill-green">💰 +${t.reward}</span>` : ''}
           <span class="pill pill-red">💀 -${t.penalita}</span>
         </div>
-        <button class="btn-complete${failed ? ' btn-complete-late' : ''}" data-id="${doc.id}">✓</button>
+        <button class="btn-complete btn-interactive${failed ? ' btn-complete-late' : ''}" data-id="${doc.id}">✓</button>
+      </div>
+      <div class="task-urgency-track">
+        <div class="task-urgency-bar${urgPulse ? ' urgency-pulse' : ''}" style="width:${urgPct.toFixed(1)}%;background:${urgColor}"></div>
       </div>
     `;
     list.appendChild(card);
@@ -588,6 +651,7 @@ async function completeTask(docId, taskData, anchorEl, nota = null) {
 
   const coinDelta = taskData.reward;
   showCoinAnimation(coinDelta, anchorEl);
+  if (coinDelta >= 4) showConfetti(anchorEl);
   if (navigator.vibrate) navigator.vibrate(100);
   await updateCoins(coinDelta);
 
@@ -1039,6 +1103,8 @@ const BADGES = [
 const shownBadges = new Set();
 
 /* ===== RENDER STATS ===== */
+let prevLevelNum = null;
+
 function renderStats() {
   if (!document.getElementById('stat-level-num')) return;
 
@@ -1067,6 +1133,11 @@ function renderStats() {
     document.getElementById('stat-level-xp').textContent  = `${coinsEarned} coin — Livello massimo!`;
     document.getElementById('stat-level-bar').style.width = '100%';
   }
+
+  // Header level + level-up detection
+  updateHeaderLevel(lvl.name);
+  if (prevLevelNum !== null && lvl.level > prevLevelNum) showLevelUpModal(lvl);
+  prevLevelNum = lvl.level;
 
   // Streak / activity
   const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
@@ -1614,3 +1685,81 @@ document.getElementById('theme-grid').addEventListener('click', async e => {
     console.error('saveTheme error:', err);
   }
 });
+
+/* ===== CONFETTI ===== */
+function showConfetti(anchorEl) {
+  const rect   = anchorEl ? anchorEl.getBoundingClientRect() : { left: window.innerWidth/2, top: window.innerHeight/2, width: 0, height: 0 };
+  const colors = ['#7c3aed','#22c55e','#eab308','#ec4899','#38bdf8','#f97316'];
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-particle';
+    const dx  = (Math.random() - 0.5) * 240;
+    const dy  = -(60 + Math.random() * 160);
+    const rot = Math.random() * 720 - 360;
+    p.style.cssText = [
+      `left:${rect.left + rect.width * 0.5 + (Math.random() - 0.5) * rect.width}px`,
+      `top:${rect.top + rect.height * 0.4}px`,
+      `background:${colors[Math.floor(Math.random() * colors.length)]}`,
+      `width:${6 + Math.random() * 6}px`,
+      `height:${6 + Math.random() * 6}px`,
+      `--dx:${dx}px`,
+      `--dy:${dy}px`,
+      `--rot:${rot}deg`,
+      `animation-delay:${Math.random() * 150}ms`
+    ].join(';');
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 2000);
+  }
+}
+
+/* ===== LEVEL UP MODAL ===== */
+function showLevelUpModal(lvl) {
+  const overlay = document.getElementById('levelup-overlay');
+  if (!overlay) return;
+  document.getElementById('levelup-icon-el').textContent = '⚔️';
+  document.getElementById('levelup-name-el').textContent = lvl.name;
+  document.getElementById('levelup-sub-el').textContent  = `Livello ${lvl.level} sbloccato! 🎉`;
+  overlay.classList.remove('hidden');
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  const close = () => overlay.classList.add('hidden');
+  const t = setTimeout(close, 3000);
+  overlay.onclick = () => { clearTimeout(t); close(); };
+}
+
+/* ===== STAT ANIMATIONS ===== */
+function animateCounterEl(el, target, duration) {
+  if (!el || isNaN(target) || target <= 0) { if (el) el.textContent = target; return; }
+  const t0 = performance.now();
+  (function tick(now) {
+    const p     = Math.min((now - t0) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 2);
+    el.textContent = Math.round(target * eased);
+    if (p < 1) requestAnimationFrame(tick);
+  })(t0);
+}
+
+function triggerStatAnimations() {
+  const ids = [
+    'stat-streak', 'stat-max-streak', 'stat-openings', 'stat-active-days',
+    'stat-completed', 'stat-failed', 'stat-total',
+    'stat-week-completed', 'stat-week-coins', 'stat-level-num'
+  ];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const target = parseInt(el.textContent, 10);
+    animateCounterEl(el, target, 600);
+  });
+
+  // Level bar: reset to 0 then animate in
+  const bar = document.getElementById('stat-level-bar');
+  if (bar) {
+    const targetW = bar.style.width;
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = ''; // use CSS rule (800ms)
+      bar.style.width = targetW;
+    }));
+  }
+}

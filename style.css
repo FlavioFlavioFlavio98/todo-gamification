@@ -51,7 +51,7 @@ body {
   left: 0;
   right: 0;
   height: var(--header-height);
-  background: var(--bg-card);
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--accent) 150%);
   border-bottom: 1px solid var(--border);
   z-index: 100;
 }
@@ -239,7 +239,7 @@ body {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity var(--transition), box-shadow var(--transition);
+  transition: opacity var(--transition), box-shadow var(--transition), transform 150ms ease;
 }
 
 .btn:active {
@@ -279,7 +279,7 @@ body {
   border: none;
   cursor: pointer;
   color: var(--text-muted);
-  transition: color var(--transition);
+  transition: color var(--transition), transform 150ms ease;
   padding: 6px 0;
   min-height: 48px;
 }
@@ -324,7 +324,7 @@ body {
   box-shadow: 0 4px 20px var(--accent-glow);
   transition: transform var(--transition), box-shadow var(--transition);
 }
-.fab:active { transform: scale(0.93); }
+.fab:active { transform: scale(0.95); }
 .fab:hover  { box-shadow: 0 6px 28px var(--accent-glow); }
 
 /* ===== MODAL ===== */
@@ -677,7 +677,7 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition), transform 150ms ease;
 }
 .btn-complete:hover {
   background: var(--green);
@@ -727,7 +727,7 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  transition: background var(--transition), color var(--transition), border-color var(--transition), transform 150ms ease;
 }
 .filter-chip.active {
   background: var(--accent);
@@ -1146,7 +1146,7 @@ body {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-light));
   border-radius: 4px;
-  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: width 800ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Stats 2×2 grid */
@@ -1343,6 +1343,16 @@ body {
   border-color: var(--border);
   opacity: 0.35;
   filter: grayscale(1);
+  position: relative;
+  overflow: hidden;
+}
+.badge-item-locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
 }
 
 .badge-icon {
@@ -1635,6 +1645,177 @@ body {
   min-width: 140px;
   font-size: 0.875rem;
   justify-content: center;
+}
+
+/* ===== V10 ADDITIONS ===== */
+
+/* Header level display */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.header-level {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.88);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Section fade transition */
+.section.fading-out {
+  display: flex !important;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+
+/* Micro-animations — scale on active/hover */
+.btn-interactive:active,
+.filter-chip:active,
+.nav-item:active,
+.btn:active,
+.btn-complete:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) {
+  .btn-interactive:hover,
+  .filter-chip:hover:not(.active),
+  .btn-primary:hover,
+  .btn-ghost:hover,
+  .btn-complete:hover {
+    transform: scale(1.05);
+  }
+  .fab:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 28px var(--accent-glow);
+  }
+}
+
+/* Urgency bar */
+.task-urgency-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.task-urgency-bar {
+  height: 100%;
+  border-radius: 4px;
+}
+
+@keyframes urgencyPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.urgency-pulse {
+  animation: urgencyPulse 1s ease-in-out infinite;
+}
+
+/* Task urgent border pulse */
+@keyframes borderPulse {
+  0%, 100% { border-color: var(--accent);  box-shadow: 0 0 0 0 var(--accent-glow); }
+  50%       { border-color: #ef4444;        box-shadow: 0 0 8px 2px rgba(239,68,68,0.4); }
+}
+
+.task-urgent {
+  animation: borderPulse 2s ease-in-out infinite;
+}
+
+/* Confetti particles */
+@keyframes confettiFly {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+}
+
+.confetti-particle {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 9999;
+  animation: confettiFly 1.8s ease-out forwards;
+}
+
+/* Level up modal */
+.levelup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.82);
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.2s ease;
+  cursor: pointer;
+}
+.levelup-overlay.hidden { display: none; }
+
+@keyframes levelupPop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  70%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes gradientRotate {
+  0%   { border-color: var(--accent); box-shadow: 0 0 28px var(--accent-glow); }
+  33%  { border-color: var(--green);  box-shadow: 0 0 28px var(--green-glow); }
+  66%  { border-color: var(--yellow); box-shadow: 0 0 28px #eab30855; }
+  100% { border-color: var(--accent); box-shadow: 0 0 28px var(--accent-glow); }
+}
+
+.levelup-panel {
+  text-align: center;
+  padding: 44px 32px 36px;
+  background: var(--bg-card);
+  border-radius: 24px;
+  border: 2px solid var(--accent);
+  max-width: 300px;
+  width: 88%;
+  animation: levelupPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+             gradientRotate 2s linear 0.45s infinite;
+}
+
+.levelup-icon {
+  font-size: 4.5rem;
+  line-height: 1;
+  margin-bottom: 14px;
+  display: block;
+  animation: badgePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+}
+
+.levelup-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent-light);
+  margin-bottom: 8px;
+}
+
+.levelup-sub {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+/* Badge shimmer keyframes */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
 }
 
 /* ===== THEME SELECTOR ===== */
