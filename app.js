@@ -328,6 +328,7 @@ db.collection('settings').doc('user').onSnapshot(snap => {
   if (snap.exists) {
     userSettings = snap.data();
     coinBalance = userSettings.coins ?? 0;
+    if (userSettings.tema) applyTheme(userSettings.tema, false);
   } else {
     userSettings = {};
     coinBalance = 0;
@@ -335,6 +336,7 @@ db.collection('settings').doc('user').onSnapshot(snap => {
   }
   setCoinDisplay(coinBalance);
   renderStats();
+  renderThemeSelector();
 });
 
 async function updateCoins(delta) {
@@ -496,11 +498,7 @@ function renderTasks(docs) {
       const doc = allTaskDocs.find(d => d.id === btn.dataset.id);
       if (!doc) return;
       const t = doc.data();
-      if (t.stato === 'fallita') {
-        completeTask(btn.dataset.id, t, btn);
-      } else {
-        showNoteModal(btn.dataset.id, t, btn);
-      }
+      completeTask(btn.dataset.id, t, btn);
     });
   });
 
@@ -552,7 +550,7 @@ function showUndoToast(onUndo, onCommit) {
   toast.classList.remove('hidden');
 
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    bar.style.transition = 'width 5s linear';
+    bar.style.transition = 'width 2s linear';
     bar.style.width = '0%';
   }));
 
@@ -560,7 +558,7 @@ function showUndoToast(onUndo, onCommit) {
   undoTimeout = setTimeout(async () => {
     toast.classList.add('hidden');
     await onCommit();
-  }, 5000);
+  }, 2000);
 
   const fresh = undoBtn.cloneNode(true);
   undoBtn.parentNode.replaceChild(fresh, undoBtn);
@@ -1391,31 +1389,6 @@ document.getElementById('search-bar').addEventListener('input', e => {
   applyFilter();
 });
 
-/* ===== NOTE MODAL ===== */
-function showNoteModal(docId, taskData, anchorEl) {
-  document.getElementById('f-nota').value = '';
-  const overlay = document.getElementById('note-modal-overlay');
-  const panel   = document.getElementById('note-modal-panel');
-  overlay.classList.remove('hidden');
-  requestAnimationFrame(() => panel.classList.add('open'));
-  document.body.style.overflow = 'hidden';
-
-  const proceed = nota => {
-    panel.classList.remove('open');
-    setTimeout(() => {
-      overlay.classList.add('hidden');
-      document.body.style.overflow = '';
-      completeTask(docId, taskData, anchorEl, nota);
-    }, 250);
-  };
-
-  document.getElementById('btn-nota-skip').onclick = () => proceed(null);
-  document.getElementById('btn-nota-save').onclick = () => {
-    const nota = document.getElementById('f-nota').value.trim();
-    proceed(nota || null);
-  };
-}
-
 /* ===== BACKUP EXPORT ===== */
 function serializeForExport(val) {
   if (val === null || val === undefined) return val;
@@ -1598,3 +1571,46 @@ function showMorningReminder() {
     if (e.target === overlay) document.getElementById('btn-morning-close').click();
   }, { once: true });
 }
+
+/* ===== THEME SYSTEM ===== */
+const THEMES = {
+  dark:   { '--bg-primary':'#0f0f1a','--bg-card':'#1a1a2e','--bg-card-hover':'#1f1f38','--accent':'#7c3aed','--accent-glow':'#7c3aed55','--accent-light':'#a855f7','--green':'#22c55e','--green-glow':'#22c55e44','--red':'#ef4444','--red-glow':'#ef444444','--yellow':'#eab308','--text-primary':'#f8fafc','--text-muted':'#94a3b8','--border':'#2d2d4e' },
+  light:  { '--bg-primary':'#f1f5f9','--bg-card':'#ffffff','--bg-card-hover':'#f8fafc','--accent':'#7c3aed','--accent-glow':'#7c3aed33','--accent-light':'#9333ea','--green':'#16a34a','--green-glow':'#16a34a44','--red':'#dc2626','--red-glow':'#dc262644','--yellow':'#ca8a04','--text-primary':'#0f172a','--text-muted':'#64748b','--border':'#e2e8f0' },
+  ocean:  { '--bg-primary':'#0a1628','--bg-card':'#0f2040','--bg-card-hover':'#132848','--accent':'#0ea5e9','--accent-glow':'#0ea5e955','--accent-light':'#38bdf8','--green':'#22d3ee','--green-glow':'#22d3ee44','--red':'#f43f5e','--red-glow':'#f43f5e44','--yellow':'#fbbf24','--text-primary':'#e0f2fe','--text-muted':'#7dd3fc','--border':'#1e3a5f' },
+  forest: { '--bg-primary':'#0d1f0d','--bg-card':'#1a2e1a','--bg-card-hover':'#243524','--accent':'#22c55e','--accent-glow':'#22c55e55','--accent-light':'#86efac','--green':'#4ade80','--green-glow':'#4ade8044','--red':'#f87171','--red-glow':'#f8717144','--yellow':'#fde68a','--text-primary':'#f0fdf4','--text-muted':'#86efac','--border':'#2d4a2d' }
+};
+
+let currentThemeKey = localStorage.getItem('ql-theme') || 'dark';
+
+function applyTheme(key, save = true) {
+  const theme = THEMES[key];
+  if (!theme) return;
+  currentThemeKey = key;
+  const root = document.documentElement;
+  Object.keys(theme).forEach(prop => root.style.setProperty(prop, theme[prop]));
+  if (save) localStorage.setItem('ql-theme', key);
+  renderThemeSelector();
+}
+
+function renderThemeSelector() {
+  document.querySelectorAll('.theme-card-item').forEach(btn => {
+    const isActive = btn.dataset.theme === currentThemeKey;
+    btn.classList.toggle('active', isActive);
+  });
+}
+
+// Initialize checkmark on page load
+renderThemeSelector();
+
+document.getElementById('theme-grid').addEventListener('click', async e => {
+  const btn = e.target.closest('.theme-card-item');
+  if (!btn) return;
+  const key = btn.dataset.theme;
+  if (!THEMES[key]) return;
+  applyTheme(key, true);
+  try {
+    await db.collection('settings').doc('user').set({ tema: key }, { merge: true });
+  } catch (err) {
+    console.error('saveTheme error:', err);
+  }
+});

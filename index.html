@@ -15,6 +15,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 
+  <!-- Early theme application (flash-free) -->
+  <script>
+    (function() {
+      var THEMES = {
+        dark:   { '--bg-primary':'#0f0f1a','--bg-card':'#1a1a2e','--bg-card-hover':'#1f1f38','--accent':'#7c3aed','--accent-glow':'#7c3aed55','--accent-light':'#a855f7','--green':'#22c55e','--green-glow':'#22c55e44','--red':'#ef4444','--red-glow':'#ef444444','--yellow':'#eab308','--text-primary':'#f8fafc','--text-muted':'#94a3b8','--border':'#2d2d4e' },
+        light:  { '--bg-primary':'#f1f5f9','--bg-card':'#ffffff','--bg-card-hover':'#f8fafc','--accent':'#7c3aed','--accent-glow':'#7c3aed33','--accent-light':'#9333ea','--green':'#16a34a','--green-glow':'#16a34a44','--red':'#dc2626','--red-glow':'#dc262644','--yellow':'#ca8a04','--text-primary':'#0f172a','--text-muted':'#64748b','--border':'#e2e8f0' },
+        ocean:  { '--bg-primary':'#0a1628','--bg-card':'#0f2040','--bg-card-hover':'#132848','--accent':'#0ea5e9','--accent-glow':'#0ea5e955','--accent-light':'#38bdf8','--green':'#22d3ee','--green-glow':'#22d3ee44','--red':'#f43f5e','--red-glow':'#f43f5e44','--yellow':'#fbbf24','--text-primary':'#e0f2fe','--text-muted':'#7dd3fc','--border':'#1e3a5f' },
+        forest: { '--bg-primary':'#0d1f0d','--bg-card':'#1a2e1a','--bg-card-hover':'#243524','--accent':'#22c55e','--accent-glow':'#22c55e55','--accent-light':'#86efac','--green':'#4ade80','--green-glow':'#4ade8044','--red':'#f87171','--red-glow':'#f8717144','--yellow':'#fde68a','--text-primary':'#f0fdf4','--text-muted':'#86efac','--border':'#2d4a2d' }
+      };
+      var key = localStorage.getItem('ql-theme') || 'dark';
+      var theme = THEMES[key] || THEMES['dark'];
+      var root = document.documentElement;
+      Object.keys(theme).forEach(function(prop) { root.style.setProperty(prop, theme[prop]); });
+    })();
+  </script>
+
   <!-- Firebase compat SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -204,6 +220,33 @@
         </button>
       </div>
 
+      <!-- Theme card -->
+      <div class="card theme-card">
+        <h3 class="card-title">🎨 Tema</h3>
+        <div id="theme-grid" class="theme-grid">
+          <button class="theme-card-item" data-theme="dark">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#0f0f1a 50%,#7c3aed 100%)"></div>
+            <span class="theme-card-label">Dark</span>
+            <span class="theme-check" id="theme-check-dark">✓</span>
+          </button>
+          <button class="theme-card-item" data-theme="light">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#f1f5f9 50%,#7c3aed 100%)"></div>
+            <span class="theme-card-label">Light</span>
+            <span class="theme-check" id="theme-check-light">✓</span>
+          </button>
+          <button class="theme-card-item" data-theme="ocean">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#0a1628 50%,#0ea5e9 100%)"></div>
+            <span class="theme-card-label">Ocean</span>
+            <span class="theme-check" id="theme-check-ocean">✓</span>
+          </button>
+          <button class="theme-card-item" data-theme="forest">
+            <div class="theme-swatch" style="background:linear-gradient(135deg,#0d1f0d 50%,#22c55e 100%)"></div>
+            <span class="theme-card-label">Forest</span>
+            <span class="theme-check" id="theme-check-forest">✓</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Backup card -->
       <div class="card backup-card">
         <h3 class="card-title">💾 Backup dati</h3>
@@ -226,7 +269,7 @@
   </main>
 
   <!-- ===== VERSION BADGE ===== -->
-  <div class="version-badge">V8</div>
+  <div class="version-badge">V9</div>
 
   <!-- ===== FAB ===== -->
   <button id="fab-add" class="fab" aria-label="Aggiungi task">+</button>
@@ -373,21 +416,6 @@
     </div>
   </div>
 
-  <!-- ===== NOTE MODAL ===== -->
-  <div id="note-modal-overlay" class="modal-overlay hidden">
-    <div id="note-modal-panel" class="modal-panel modal-panel-sm">
-      <div class="modal-handle"></div>
-      <h2 class="modal-title">📝 Vuoi aggiungere una nota?</h2>
-      <div class="modal-body">
-        <textarea id="f-nota" class="form-textarea" placeholder="Es. ci ho messo più del previsto…" rows="3" maxlength="300"></textarea>
-      </div>
-      <div class="modal-footer">
-        <button id="btn-nota-skip" class="btn btn-ghost">Salta</button>
-        <button id="btn-nota-save" class="btn btn-primary">Salva nota</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ===== IMPORT CONFIRM MODAL ===== -->
   <div id="import-modal-overlay" class="modal-overlay hidden">
     <div id="import-modal-panel" class="modal-panel modal-panel-sm">
@@ -477,6 +505,14 @@
       <div class="modal-handle"></div>
       <h2 class="modal-title">📋 Novità e versioni</h2>
       <div class="modal-body changelog-body">
+        <div class="changelog-block">
+          <p class="changelog-version">V9 — Blocco 8</p>
+          <ul class="changelog-items">
+            <li>Sistema temi: Dark, Light, Ocean, Forest</li>
+            <li>Completamento task diretto al toast (senza modal nota)</li>
+            <li>Timer annullamento ridotto a 2 secondi</li>
+          </ul>
+        </div>
         <div class="changelog-block">
           <p class="changelog-version">V8 — Blocco 7B</p>
           <ul class="changelog-items">
